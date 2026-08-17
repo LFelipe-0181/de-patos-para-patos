@@ -4,150 +4,131 @@ const next = require("next");
 const { Server } = require("socket.io");
 
 const dev = process.env.NODE_ENV !== "production";
-const hostname = "0.0.0.0";
-const port = 3000;
+const hostname = "localhost";
+
+// CORREÇÃO CRÍTICA PARA O RENDER:
+const port = process.env.PORT || 3000; 
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-let filaDeEspera = [];
-const confirmacoesSalas = {};
-
 app.prepare().then(() => {
-  const httpServer = createServer((req, res) => handle(req, res, parse(req.url, true)));
-  
-  const io = new Server(httpServer, {
-    maxHttpBufferSize: 1e7
+  const server = createServer(async (req, res) => {
+    try {
+      const parsedUrl = parse(req.url, true);
+      await handle(req, res, parsedUrl);
+    } catch (err) {
+      console.error("Erro na requisição HTTP", err);
+      res.statusCode = 500;
+      res.end("Internal Server Error");
+    }
   });
 
+  const io = new Server(server, {
+    cors: { origin: "*" }
+  });
+
+  // ==========================================
+  // LÓGICA DO BACKEND DUCKZONE (SOCKET.IO)
+  // ==========================================
+  
+  let filaEspera = null;
+  const salasConfirmacao = new Map(); // Guarda quantos patos aceitaram a conexão
+
   io.on("connection", (socket) => {
-    
+    // 1. Entrar em sala privada (Ninhos Salvos)
+    socket.on("entrar_sala_privada", ({ novaSalaPrivada }) => {
+      socket.join(novaSalaPrivada);
+    });
+
+    // 2. Procurar Parceiro na Lagoa Pública
     socket.on("procurar_parceiro", () => {
-      filaDeEspera = filaDeEspera.filter((s) => s.id !== socket.id);
-      socket.patoAnonimo = `Pato Anônimo #${Math.floor(1000 + Math.random() * 9000)}`;
+      if (filaEspera && filaEspera.id !== socket.id) {
+        const parceiro = filaEspera;
+        filaEspera = null;
 
-      if (filaDeEspera.length > 0) {
-        const parceiro = filaDeEspera.shift();
-        const salaId = `lagoa_${socket.id}_${parceiro.id}`;
-
+        const salaId = `lagoa_${Date.now()}`;
         socket.join(salaId);
         parceiro.join(salaId);
 
-        socket.salaAtual = salaId;
-        parceiro.salaAtual = salaId;
+        salasConfirmacao.set(salaId, new Set());
 
-        confirmacoesSalas[salaId] = 0;
-
-        socket.emit("parceiro_encontrado", { salaId, meuNome: socket.patoAnonimo, parceiroNome: parceiro.patoAnonimo });
-        parceiro.emit("parceiro_encontrado", { salaId, meuNome: parceiro.patoAnonimo, parceiroNome: socket.patoAnonimo });
+        io.to(socket.id).emit("parceiro_encontrado", { salaId, meuNome: "Pato 1", parceiroNome: "Pato 2" });
+        io.to(parceiro.id).emit("parceiro_encontrado", { salaId, meuNome: "Pato 2", parceiroNome: "Pato 1" });
       } else {
-        filaDeEspera.push(socket);
+        filaEspera = socket;
         socket.emit("aguardando_parceiro");
       }
     });
 
-    socket.on("confirmar_conexao", (data) => {
-      const salaId = data.salaId;
-      if (!salaId) return;
+    // 3. Confirmar Conexão Dupla
+    socket.on("confirmar_conexao", ({ salaId }) => {
+      const confirmados = salasConfirmacao.get(salaId);
+      if (confirmados) {
+        confirmados.add(socket.id);
+        io.to(salaId).emit("atualizar_confirmacao", { confirmados: confirmados.size });
 
-      if (confirmacoesSalas[salaId] !== undefined) {
-        confirmacoesSalas[salaId] += 1;
-        const total = confirmacoesSalas[salaId];
-
-        if (total === 1) {
-          io.to(salaId).emit("atualizar_confirmacao", { confirmados: 1 });
-        } else if (total >= 2) {
+        if (confirmados.size === 2) {
           io.to(salaId).emit("conexao_confirmada", { salaId });
-          delete confirmacoesSalas[salaId];
+          salasConfirmacao.delete(salaId);
         }
       }
     });
 
+    // 4. Chat de Texto, Imagens e Áudio
     socket.on("enviar_mensagem", (data) => {
-      if (!data.salaId) return;
-      const hora = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
+      const msgId = `msg_${Date.now()}`;
+      const hora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       io.to(data.salaId).emit("receber_mensagem", {
         id: msgId,
         salaId: data.salaId,
         usuario: data.remetenteNome,
         mensagem: data.mensagem,
-        imagem: data.imagem || null,
-        audio: data.audio || null,
+        imagem: data.imagem,
+        audio: data.audio,
         hora
       });
     });
 
-    socket.on("apagar_mensagem", (data) => {
-      if (!data.salaId || !data.msgId) return;
-      io.to(data.salaId).emit("mensagem_apagada", {
-        salaId: data.salaId,
-        msgId: data.msgId
-      });
+    socket.on("apagar_mensagem", ({ salaId, msgId }) => {
+      io.to(salaId).emit("mensagem_apagada", { salaId, msgId });
     });
 
-    // SISTEMA WEBRTC - CONVITE E ACEITE EXPLÍCITO
-    socket.on("iniciar_chamada_voz", (data) => {
-      socket.to(data.salaId).emit("recebeu_chamada_voz");
-    });
+    // 5. Chamada de Voz (Sinalização WebRTC)
+    socket.on("iniciar_chamada_voz", ({ salaId }) => socket.to(salaId).emit("recebeu_chamada_voz"));
+    socket.on("aceitar_chamada_voz", ({ salaId }) => socket.to(salaId).emit("chamada_voz_aceita_pelo_parceiro"));
+    socket.on("recusar_chamada_voz", ({ salaId }) => socket.to(salaId).emit("chamada_voz_recusada"));
+    socket.on("encerrar_chamada_voz", ({ salaId }) => socket.to(salaId).emit("chamada_voz_encerrada"));
+    socket.on("webrtc_offer", ({ salaId, offer }) => socket.to(salaId).emit("webrtc_offer", { offer }));
+    socket.on("webrtc_answer", ({ salaId, answer }) => socket.to(salaId).emit("webrtc_answer", { answer }));
+    socket.on("webrtc_ice_candidate", ({ salaId, candidate }) => socket.to(salaId).emit("webrtc_ice_candidate", { candidate }));
 
-    socket.on("aceitar_chamada_voz", (data) => {
-      socket.to(data.salaId).emit("chamada_voz_aceita_pelo_parceiro");
+    // 6. Migração para Ninho Privado
+    socket.on("solicitar_chat_privado", ({ salaId, meuNome }) => {
+      socket.to(salaId).emit("recebeu_convite_privado", { solicitante: meuNome });
     });
-
-    socket.on("webrtc_offer", (data) => {
-      socket.to(data.salaId).emit("webrtc_offer", { offer: data.offer });
-    });
-
-    socket.on("webrtc_answer", (data) => {
-      socket.to(data.salaId).emit("webrtc_answer", { answer: data.answer });
-    });
-
-    socket.on("webrtc_ice_candidate", (data) => {
-      socket.to(data.salaId).emit("webrtc_ice_candidate", { candidate: data.candidate });
-    });
-
-    socket.on("recusar_chamada_voz", (data) => {
-      socket.to(data.salaId).emit("chamada_voz_recusada");
-    });
-
-    socket.on("encerrar_chamada_voz", (data) => {
-      socket.to(data.salaId).emit("chamada_voz_encerrada");
-    });
-
-    socket.on("solicitar_chat_privado", (data) => {
-      socket.to(data.salaId).emit("recebeu_convite_privado", {
-        solicitante: data.meuNome
-      });
-    });
-
-    socket.on("responder_convite_privado", (data) => {
-      if (data.aceito) {
+    socket.on("responder_convite_privado", ({ salaId, aceito }) => {
+      if (aceito) {
         const novaSalaPrivada = `ninho_${Date.now()}`;
-        io.to(data.salaId).emit("migrar_para_privado", { novaSalaPrivada });
+        io.to(salaId).emit("migrar_para_privado", { novaSalaPrivada });
       } else {
-        socket.to(data.salaId).emit("convite_privado_recusado");
+        socket.to(salaId).emit("convite_privado_recusado");
       }
     });
 
-    socket.on("entrar_sala_privada", (data) => {
-      socket.join(data.novaSalaPrivada);
-    });
-
-    const limpar = () => {
-      filaDeEspera = filaDeEspera.filter((s) => s.id !== socket.id);
-      if (socket.salaAtual) {
-        delete confirmacoesSalas[socket.salaAtual];
-        socket.to(socket.salaAtual).emit("parceiro_desconectou");
-        socket.leave(socket.salaAtual);
-        socket.salaAtual = null;
+    // 7. Tratamento de Desconexão
+    socket.on("disconnect", () => {
+      if (filaEspera && filaEspera.id === socket.id) {
+        filaEspera = null;
       }
-    };
-
-    socket.on("sair_da_lagoa", limpar);
-    socket.on("disconnect", limpar);
+      // Avisa as salas (Lagoa ou Ninhos) que o usuário saiu
+      Array.from(socket.rooms).forEach(room => {
+        if (room !== socket.id) socket.to(room).emit("parceiro_desconectou");
+      });
+    });
   });
 
-  httpServer.listen(port, () => console.log(`> DuckZone rodando na porta ${port}`));
+  server.listen(port, () => {
+    console.log(`🚀 Servidor DuckZone rodando lindamente na porta ${port}`);
+  });
 });
