@@ -39,9 +39,7 @@ export default function ChatPage() {
   const [microfoneMutado, setMicrofoneMutado] = useState<boolean>(false);
   const microfoneMutadoRef = useRef<boolean>(false);
 
-  // NOVO: Estado para ensurdecer (não ouvir os outros)
   const [audioMutado, setAudioMutado] = useState<boolean>(false);
-
   const [testandoMic, setTestandoMic] = useState<boolean>(false);
   
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -55,7 +53,6 @@ export default function ChatPage() {
   useEffect(() => { volumeEntradaRef.current = volumeEntrada; }, [volumeEntrada]);
   useEffect(() => { microfoneMutadoRef.current = microfoneMutado; }, [microfoneMutado]);
 
-  // Atualiza Mute do Alto-Falante (Ensurdecer)
   useEffect(() => {
     if (remoteAudioRef.current) {
       remoteAudioRef.current.muted = audioMutado;
@@ -100,7 +97,13 @@ export default function ChatPage() {
   const testAnimationFrameRef = useRef<number | null>(null);
 
   const [abaAtiva, setAbaAtiva] = useState<string>("lagoa");
+  const abaAtivaRef = useRef<string>("lagoa");
+  useEffect(() => { abaAtivaRef.current = abaAtiva; }, [abaAtiva]);
+
   const [lagoaId, setLagoaId] = useState<string | null>(null);
+  const lagoaIdRef = useRef<string | null>(null);
+  useEffect(() => { lagoaIdRef.current = lagoaId; }, [lagoaId]);
+
   const [lagoaPendente, setLagoaPendente] = useState<string | null>(null);
   const [lagoaAtiva, setLagoaAtiva] = useState<boolean>(false);
   const [procurando, setProcurando] = useState<boolean>(false);
@@ -356,6 +359,7 @@ export default function ChatPage() {
     }
   }, [privados]);
 
+  // ======= SOCKET CONEXÃO ÚNICA (SEM RE-TRIGGER POR ABA OU LAGOAID) =======
   useEffect(() => {
     const socket = io();
     socketRef.current = socket;
@@ -383,9 +387,11 @@ export default function ChatPage() {
       setJaAceitou(false);
     });
 
-    socket.on("atualizar_confirmacao", (data) => setConfirmados(data.confirmados));
+    socket.on("atualizar_confirmacao", (data: { confirmados: number }) => {
+      setConfirmados(data.confirmados);
+    });
 
-    socket.on("conexao_confirmada", (data) => {
+    socket.on("conexao_confirmada", (data: { salaId: string }) => {
       setLagoaId(data.salaId);
       setLagoaAtiva(true);
       setLagoaPendente(null);
@@ -433,7 +439,7 @@ export default function ChatPage() {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
-        const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
+        const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
         socketRef.current?.emit("webrtc_answer", { salaId: salaAlvo, answer });
         setChamadaAtiva(true);
       } catch (err) {
@@ -519,7 +525,7 @@ export default function ChatPage() {
       pararTesteMic();
       socket.disconnect();
     };
-  }, [abaAtiva, lagoaId]);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -611,7 +617,6 @@ export default function ChatPage() {
   const alternarMuteMicrofone = () => {
     setMicrofoneMutado((prev) => {
       const novo = !prev;
-      // Se estou desmutando o mic e estava ensurdecido, tira o surdo também
       if (!novo && audioMutado) {
         setAudioMutado(false);
       }
@@ -623,7 +628,6 @@ export default function ChatPage() {
     setAudioMutado((prev) => {
       const novo = !prev;
       if (novo) {
-        // Regra do Discord: Se você se ensurdece, seu mic muta junto
         setMicrofoneMutado(true);
       }
       return novo;
@@ -715,7 +719,15 @@ export default function ChatPage() {
   };
 
   const procurarPato = () => { setProcurando(true); socketRef.current?.emit("procurar_parceiro"); };
-  const aceitarConexao = () => { if (lagoaPendente && !jaAceitou) { setJaAceitou(true); socketRef.current?.emit("confirmar_conexao", { salaId: lagoaPendente }); } };
+  
+  // CORREÇÃO CRÍTICA DO ACEITE DE CONEXÃO
+  const aceitarConexao = () => { 
+    if (lagoaPendente && !jaAceitou) { 
+      setJaAceitou(true); 
+      socketRef.current?.emit("confirmar_conexao", { salaId: lagoaPendente }); 
+    } 
+  };
+  
   const recusarConexao = () => { setLagoaPendente(null); setJaAceitou(false); setConfirmados(0); procurarPato(); };
   
   const solicitarPrivado = () => { if (!lagoaId) return; setStatusConvite("Convite enviado! Aguardando..."); socketRef.current?.emit("solicitar_chat_privado", { salaId: lagoaId, meuNome: meuNomeAnon }); };
@@ -810,7 +822,6 @@ export default function ChatPage() {
           background: transparent;
         }
 
-        /* --- NOVO PAINEL DE CHAMADA ESTILO DISCORD --- */
         .discord-call-panel-v2 {
           background-color: #111214;
           border: 1px solid #1e1f22;
@@ -900,7 +911,6 @@ export default function ChatPage() {
           border-color: transparent;
         }
 
-        /* Tooltip Discord Effect */
         .d-action-btn::after {
           content: attr(data-tooltip);
           position: absolute;
@@ -922,7 +932,6 @@ export default function ChatPage() {
           opacity: 1;
         }
 
-        /* Classes do Modal Premium */
         .pro-input {
           width: 100%;
           background: #121e24;
@@ -1060,7 +1069,7 @@ export default function ChatPage() {
         </header>
 
         <div className="chat-body">
-          {/* PAINEL CHAMADA ATIVA (NOVO DESIGN DISCORD) */}
+          {/* PAINEL CHAMADA ATIVA */}
           {chamadaAtiva && (
             <div className="discord-call-panel-v2">
               <div className="d-call-info">
@@ -1106,7 +1115,7 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* PAINEL CHAMADA RECEBIDA (NOVO DESIGN DISCORD) */}
+          {/* PAINEL CHAMADA RECEBIDA */}
           {chamadaRecebida && !chamadaAtiva && (
             <div className="discord-call-panel-v2" style={{ borderLeft: '4px solid #23a559' }}>
               <div className="d-call-info">
@@ -1288,7 +1297,7 @@ export default function ChatPage() {
               </button>
             </div>
             
-            {/* CORPO DO MODAL (ROLÁVEL) */}
+            {/* CORPO DO MODAL */}
             <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
               
               {/* SEÇÃO 1: PERFIL */}
@@ -1404,7 +1413,7 @@ export default function ChatPage() {
               </div>
             </div>
 
-            {/* RODAPÉ FIXO (BOTÃO SALVAR) */}
+            {/* RODAPÉ FIXO */}
             <div style={{ 
               padding: '20px 24px', borderTop: '1px solid #1f2d35', 
               background: 'rgba(11, 20, 26, 0.95)', zIndex: 10
