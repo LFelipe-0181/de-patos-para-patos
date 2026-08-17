@@ -1,188 +1,291 @@
 ﻿"use client";
 
-import { useSession, signIn, signOut } from "next-auth/react";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { signIn } from "next-auth/react";
+import { useState } from "react";
 
 export default function Home() {
-  const { data: session, status } = useSession();
-  const [mounted, setMounted] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
+  const [nome, setNome] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  // Evita erros de hidratação no Next.js
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) return null;
+  // Função simulada para o form de Email/Senha (precisa do CredentialsProvider no auth.ts)
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isLogin) {
+      alert("Para o login com e-mail funcionar, configure o CredentialsProvider no NextAuth!");
+      // signIn("credentials", { email, password });
+    } else {
+      alert("Para cadastrar contas, você precisará conectar um Banco de Dados (ex: Prisma/MongoDB).");
+    }
+  };
 
   return (
-    <div style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "100vh",
-      width: "100vw",
-      background: "radial-gradient(circle at 50% 30%, #082a33 0%, #020d12 60%, #010608 100%)",
-      color: "#fff",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      padding: "20px",
-      boxSizing: "border-box"
-    }}>
-      <div style={{
-        background: "rgba(6, 24, 33, 0.6)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        border: "1px solid rgba(45, 212, 191, 0.2)",
-        borderRadius: "28px",
-        padding: "40px 32px",
-        width: "100%",
-        maxWidth: "400px",
-        textAlign: "center",
-        boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 30px rgba(20, 184, 166, 0.15)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "20px"
-      }}>
-        
-        {/* Cabeçalho do Card */}
-        <div>
-          <div style={{
-            fontSize: "64px",
-            marginBottom: "10px",
-            animation: "floatDuck 3.5s ease-in-out infinite",
-            display: "inline-block"
-          }}>
-            🦆
-          </div>
-          <h1 style={{
-            fontSize: "32px",
-            fontWeight: "900",
-            margin: "0 0 5px 0",
-            background: "linear-gradient(135deg, #2dd4bf, #34d399)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent"
-          }}>
-            DuckZone
-          </h1>
-          <p style={{
-            fontSize: "12px",
-            color: "#14b8a6",
-            letterSpacing: "1.5px",
-            textTransform: "uppercase",
-            margin: 0,
-            opacity: 0.8,
-            fontWeight: "bold"
-          }}>
-            Mergulho Anônimo & Direct
-          </p>
-        </div>
-
-        {/* Linha Divisória */}
-        <div style={{ height: "1px", background: "rgba(45, 212, 191, 0.15)", width: "100%", margin: "4px 0" }}></div>
-
-        {/* Área de Autenticação */}
-        {status === "loading" ? (
-          <div style={{ padding: "20px 0" }}>
-            <div style={{ width: "32px", height: "32px", border: "3px solid rgba(45,212,191,0.2)", borderTopColor: "#2dd4bf", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto" }}></div>
-          </div>
-        ) : session ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px", alignItems: "center" }}>
-            
-            {/* Box do Usuário Logado */}
-            <div style={{ 
-              background: "rgba(2, 13, 18, 0.6)", 
-              padding: "12px", 
-              borderRadius: "16px", 
-              width: "100%", 
-              border: "1px solid rgba(45, 212, 191, 0.15)" 
-            }}>
-              <p style={{ fontSize: "10px", color: "#94a3b8", margin: "0 0 4px 0", letterSpacing: "1px" }}>CONECTADO COMO</p>
-              <p style={{ fontSize: "14px", fontWeight: "bold", color: "#f1f5f9", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {session.user?.email}
-              </p>
-            </div>
-            
-            {/* Botão Principal de Entrar */}
-            <Link href="/chat" style={{ width: "100%", textDecoration: "none" }}>
-              <button style={{
-                width: "100%",
-                padding: "16px",
-                background: "linear-gradient(135deg, #2dd4bf, #10b981)",
-                border: "none",
-                borderRadius: "16px",
-                color: "#020d12",
-                fontSize: "15px",
-                fontWeight: "900",
-                cursor: "pointer",
-                boxShadow: "0 4px 20px rgba(20, 184, 166, 0.4)",
-                transition: "transform 0.2s, box-shadow 0.2s"
-              }}
-              onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 25px rgba(20, 184, 166, 0.6)"; }}
-              onMouseOut={(e) => { e.currentTarget.style.transform = "translateY(0px)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(20, 184, 166, 0.4)"; }}
-              >
-                ENTRAR NA ÁGUA 🚀
-              </button>
-            </Link>
-
-            {/* Botão de Logout Secundário */}
-            <button onClick={() => signOut()} style={{
-              background: "transparent",
-              border: "1px solid rgba(244, 63, 94, 0.3)",
-              color: "#f43f5e",
-              padding: "12px",
-              borderRadius: "14px",
-              fontSize: "13px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              width: "100%",
-              transition: "all 0.2s ease"
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.background = "rgba(244, 63, 94, 0.1)"; e.currentTarget.style.borderColor = "#f43f5e"; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "rgba(244, 63, 94, 0.3)"; }}
-            >
-              Sair da Conta 🚪
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0, lineHeight: "1.6" }}>
-              Conecte-se para conversar de forma 100% anônima e migrar para salas privadas quando a vibe bater.
-            </p>
-            <button onClick={() => signIn("google")} style={{
-              width: "100%",
-              padding: "16px",
-              background: "rgba(2, 13, 18, 0.8)",
-              border: "1px solid rgba(45, 212, 191, 0.4)",
-              borderRadius: "16px",
-              color: "#fff",
-              fontSize: "15px",
-              fontWeight: "700",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "12px",
-              transition: "all 0.2s ease"
-            }}
-            onMouseOver={(e) => { e.currentTarget.style.borderColor = "#14b8a6"; e.currentTarget.style.boxShadow = "0 0 15px rgba(20, 184, 166, 0.2)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-            onMouseOut={(e) => { e.currentTarget.style.borderColor = "rgba(45, 212, 191, 0.4)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = "translateY(0px)"; }}
-            >
-              <span style={{ fontSize: "20px" }}>🌐</span> Entrar com Google
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Animações Globais Exclusivas dessa Tela */}
+    <div className="auth-container">
+      {/* Estilos injetados diretamente para garantir o visual premium */}
       <style dangerouslySetInnerHTML={{__html: `
-        @keyframes floatDuck {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-8px) rotate(4deg); }
+        .auth-container {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: radial-gradient(circle at 50% -20%, #0f3847 0%, #020d12 80%);
+          font-family: 'Inter', system-ui, sans-serif;
+          padding: 20px;
         }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
+
+        .auth-card {
+          background: rgba(11, 20, 26, 0.6);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(45, 212, 191, 0.15);
+          border-radius: 24px;
+          padding: 40px 32px;
+          width: 100%;
+          max-width: 420px;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+          animation: fade-in-up 0.5s ease-out;
+        }
+
+        @keyframes fade-in-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        .duck-logo {
+          font-size: 56px;
+          text-align: center;
+          margin-bottom: 16px;
+          display: inline-block;
+          width: 100%;
+          animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-10px); }
+          100% { transform: translateY(0px); }
+        }
+
+        .auth-title {
+          text-align: center;
+          font-size: 28px;
+          font-weight: 900;
+          background: linear-gradient(135deg, #2dd4bf, #10b981);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          margin-bottom: 8px;
+        }
+
+        .auth-subtitle {
+          text-align: center;
+          color: #94a3b8;
+          font-size: 14px;
+          margin-bottom: 32px;
+          line-height: 1.5;
+        }
+
+        .input-group {
+          margin-bottom: 16px;
+        }
+
+        .auth-input {
+          width: 100%;
+          background: #121e24;
+          border: 1px solid #1f2d35;
+          color: #f8fafc;
+          padding: 14px 16px;
+          border-radius: 12px;
+          font-size: 14px;
+          outline: none;
+          transition: all 0.2s ease;
+        }
+
+        .auth-input:focus {
+          border-color: #2dd4bf;
+          box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.1);
+          background: #16252d;
+        }
+
+        .auth-input::placeholder {
+          color: #64748b;
+        }
+
+        .btn-primary {
+          width: 100%;
+          background: linear-gradient(135deg, #2dd4bf, #10b981);
+          color: #020d12;
+          font-weight: 800;
+          font-size: 15px;
+          padding: 14px;
+          border: none;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s;
+          margin-top: 8px;
+        }
+
+        .btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(45, 212, 191, 0.3);
+        }
+
+        .divider {
+          display: flex;
+          align-items: center;
+          text-align: center;
+          margin: 24px 0;
+          color: #475569;
+          font-size: 12px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+
+        .divider::before, .divider::after {
+          content: '';
+          flex: 1;
+          border-bottom: 1px solid #1f2d35;
+        }
+        .divider::before { margin-right: 12px; }
+        .divider::after { margin-left: 12px; }
+
+        .social-buttons {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .btn-social {
+          width: 100%;
+          background: #18191b;
+          border: 1px solid #2b2d31;
+          color: #dbdee1;
+          font-weight: 600;
+          font-size: 14px;
+          padding: 12px;
+          border-radius: 12px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          transition: all 0.2s ease;
+        }
+
+        .btn-social:hover {
+          background: #2b2d31;
+          border-color: #404249;
+          transform: translateY(-1px);
+        }
+
+        .btn-social svg {
+          width: 20px;
+          height: 20px;
+        }
+
+        .auth-footer {
+          text-align: center;
+          margin-top: 24px;
+          font-size: 14px;
+          color: #94a3b8;
+        }
+
+        .auth-footer span {
+          color: #2dd4bf;
+          font-weight: 700;
+          cursor: pointer;
+          transition: color 0.2s;
+        }
+        
+        .auth-footer span:hover {
+          color: #10b981;
+          text-decoration: underline;
         }
       `}} />
+
+      <div className="auth-card">
+        <div className="duck-logo">🦆</div>
+        <h1 className="auth-title">DuckZone</h1>
+        <p className="auth-subtitle">
+          {isLogin 
+            ? "Mergulhe anonimamente ou entre em ninhos privados." 
+            : "Crie sua conta para salvar seus ninhos e configurações."}
+        </p>
+
+        {/* FORMULÁRIO DE EMAIL / SENHA */}
+        <form onSubmit={handleEmailSubmit}>
+          {!isLogin && (
+            <div className="input-group">
+              <input 
+                type="text" 
+                placeholder="Como os patos devem te chamar?" 
+                className="auth-input"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                required
+              />
+            </div>
+          )}
+          
+          <div className="input-group">
+            <input 
+              type="email" 
+              placeholder="Seu melhor e-mail" 
+              className="auth-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="input-group">
+            <input 
+              type="password" 
+              placeholder="Senha secreta" 
+              className="auth-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <button type="submit" className="btn-primary">
+            {isLogin ? "Entrar na Lagoa" : "Criar minha Conta"}
+          </button>
+        </form>
+
+        <div className="divider">ou conecte com</div>
+
+        {/* BOTÕES SOCIAIS */}
+        <div className="social-buttons">
+          <button onClick={() => signIn("google")} className="btn-social">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Continuar com Google
+          </button>
+
+          <button onClick={() => signIn("discord")} className="btn-social">
+            <svg viewBox="0 0 127.14 96.36" fill="#5865F2" xmlns="http://www.w3.org/2000/svg">
+              <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1,105.25,105.25,0,0,0,32.19-16.14c2.64-27.38-4.51-51.11-19.32-72.15ZM42.68,65.17c-5.46,0-9.99-5.09-9.99-11.32s4.42-11.32,9.99-11.32c5.59,0,10.08,5.13,9.99,11.32,0,6.23-4.46,11.32-9.99,11.32Zm41.83,0c-5.46,0-9.99-5.09-9.99-11.32s4.42-11.32,9.99-11.32c5.59,0,10.08,5.13,9.99,11.32,0,6.23-4.46,11.32-9.99,11.32Z"/>
+            </svg>
+            Continuar com Discord
+          </button>
+        </div>
+
+        {/* RODAPÉ: TROCAR ENTRE LOGIN E CADASTRO */}
+        <div className="auth-footer">
+          {isLogin ? (
+            <>Não tem uma conta? <span onClick={() => setIsLogin(false)}>Cadastre-se</span></>
+          ) : (
+            <>Já é um pato registrado? <span onClick={() => setIsLogin(true)}>Fazer Login</span></>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
