@@ -9,12 +9,10 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // Função simulada para o form de Email/Senha (precisa do CredentialsProvider no auth.ts)
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isLogin) {
       alert("Para o login com e-mail funcionar, configure o CredentialsProvider no NextAuth!");
-      // signIn("credentials", { email, password });
     } else {
       alert("Para cadastrar contas, você precisará conectar um Banco de Dados (ex: Prisma/MongoDB).");
     }
@@ -22,7 +20,6 @@ export default function Home() {
 
   return (
     <div className="auth-container">
-      {/* Estilos injetados diretamente para garantir o visual premium */}
       <style dangerouslySetInnerHTML={{__html: `
         .auth-container {
           min-height: 100vh;
@@ -257,7 +254,7 @@ export default function Home() {
 
         <div className="divider">ou conecte com</div>
 
-        {/* BOTÕES SOCIAIS */}
+        {/* BOTÕES SOCIAIS - APENAS GOOGLE */}
         <div className="social-buttons">
           <button onClick={() => signIn("google")} className="btn-social">
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -267,13 +264,6 @@ export default function Home() {
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
             Continuar com Google
-          </button>
-
-          <button onClick={() => signIn("discord")} className="btn-social">
-            <svg viewBox="0 0 127.14 96.36" fill="#5865F2" xmlns="http://www.w3.org/2000/svg">
-              <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1,105.25,105.25,0,0,0,32.19-16.14c2.64-27.38-4.51-51.11-19.32-72.15ZM42.68,65.17c-5.46,0-9.99-5.09-9.99-11.32s4.42-11.32,9.99-11.32c5.59,0,10.08,5.13,9.99,11.32,0,6.23-4.46,11.32-9.99,11.32Zm41.83,0c-5.46,0-9.99-5.09-9.99-11.32s4.42-11.32,9.99-11.32c5.59,0,10.08,5.13,9.99,11.32,0,6.23-4.46,11.32-9.99,11.32Z"/>
-            </svg>
-            Continuar com Discord
           </button>
         </div>
 
