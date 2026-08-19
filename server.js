@@ -5,8 +5,6 @@ const { Server } = require("socket.io");
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
-
-// CORREÇÃO CRÍTICA PARA O RENDER:
 const port = process.env.PORT || 3000; 
 
 const app = next({ dev, hostname, port });
@@ -28,12 +26,8 @@ app.prepare().then(() => {
     cors: { origin: "*" }
   });
 
-  // ==========================================
-  // LÓGICA DO BACKEND DUCKZONE (SOCKET.IO)
-  // ==========================================
-  
   let filaEspera = null;
-  const salasConfirmacao = new Map(); // Guarda quantos patos aceitaram a conexão
+  const salasConfirmacao = new Map(); 
 
   io.on("connection", (socket) => {
     // 1. Entrar em sala privada (Ninhos Salvos)
@@ -61,7 +55,7 @@ app.prepare().then(() => {
       }
     });
 
-    // 3. Confirmar Conexão Dupla
+    // 3. Confirmar Conexão + Timer de 6 Minutos
     socket.on("confirmar_conexao", ({ salaId }) => {
       const confirmados = salasConfirmacao.get(salaId);
       if (confirmados) {
@@ -71,11 +65,27 @@ app.prepare().then(() => {
         if (confirmados.size === 2) {
           io.to(salaId).emit("conexao_confirmada", { salaId });
           salasConfirmacao.delete(salaId);
+
+          // TIMER DE 6 MINUTOS NA LAGOA
+          setTimeout(() => {
+            io.to(salaId).emit("tempo_esgotado");
+            io.in(salaId).socketsLeave(salaId);
+          }, 360000);
         }
       }
     });
 
-    // 4. Chat de Texto, Imagens e Áudio
+    // Sair da Lagoa manualmente
+    socket.on("sair_da_lagoa", () => {
+      Array.from(socket.rooms).forEach(room => {
+        if(room.startsWith("lagoa_")) {
+          socket.leave(room);
+          socket.to(room).emit("parceiro_desconectou");
+        }
+      });
+    });
+
+    // 4. Chat de Texto, Imagens e Áudio (RESTOUROU)
     socket.on("enviar_mensagem", (data) => {
       const msgId = `msg_${Date.now()}`;
       const hora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

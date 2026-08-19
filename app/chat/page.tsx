@@ -16,6 +16,7 @@ interface Mensagem {
 
 interface ChatPrivado {
   id: string;
+  nomeCustom?: string;
   mensagens: Mensagem[];
 }
 
@@ -27,56 +28,28 @@ export default function ChatPage() {
   const [meuAvatar, setMeuAvatar] = useState<string>("🦆");
   const [modalPerfilAberto, setModalPerfilAberto] = useState<boolean>(false);
 
-  // ESTADOS DE ÁUDIO E REFS
-  const [sensibilidade, setSensibilidade] = useState<number>(30);
-  const sensibilidadeRef = useRef<number>(30);
-  
-  const [volumeEntrada, setVolumeEntrada] = useState<number>(100);
-  const volumeEntradaRef = useRef<number>(100);
-
+  // ÁUDIO
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
-  
   const [microfoneMutado, setMicrofoneMutado] = useState<boolean>(false);
-  const microfoneMutadoRef = useRef<boolean>(false);
-
   const [audioMutado, setAudioMutado] = useState<boolean>(false);
   const [testandoMic, setTestandoMic] = useState<boolean>(false);
   
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
   const testStreamRef = useRef<MediaStream | null>(null);
-  const testAudioContextRef = useRef<AudioContext | null>(null);
 
-  const inputGainNodeRef = useRef<GainNode | null>(null);
-  const testInputGainNodeRef = useRef<GainNode | null>(null);
-
-  useEffect(() => { sensibilidadeRef.current = sensibilidade; }, [sensibilidade]);
-  useEffect(() => { volumeEntradaRef.current = volumeEntrada; }, [volumeEntrada]);
-  useEffect(() => { microfoneMutadoRef.current = microfoneMutado; }, [microfoneMutado]);
+  // TIMER DA LAGOA
+  const [tempoRestante, setTempoRestante] = useState<number | null>(null);
 
   useEffect(() => {
     if (remoteAudioRef.current) {
       remoteAudioRef.current.muted = audioMutado;
-    }
-  }, [audioMutado]);
-
-  useEffect(() => {
-    const val = volumeEntrada / 100;
-    if (inputGainNodeRef.current && audioContextRef.current) {
-      inputGainNodeRef.current.gain.setTargetAtTime(val, audioContextRef.current.currentTime, 0.1);
-    }
-    if (testInputGainNodeRef.current && testAudioContextRef.current) {
-      testInputGainNodeRef.current.gain.setTargetAtTime(val, testAudioContextRef.current.currentTime, 0.1);
-    }
-  }, [volumeEntrada]);
-  
-  useEffect(() => {
-    if (remoteAudioRef.current) {
       remoteAudioRef.current.volume = volumeSaida / 100;
     }
     if (testAudioRef.current) {
       testAudioRef.current.volume = volumeSaida / 100;
     }
-  }, [volumeSaida]);
+  }, [audioMutado, volumeSaida]);
 
   useEffect(() => {
     if (session?.user) {
@@ -87,14 +60,9 @@ export default function ChatPage() {
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
 
   const ringtoneCtxRef = useRef<AudioContext | null>(null);
   const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const animationFrameRef = useRef<number | null>(null);
-  const testAnimationFrameRef = useRef<number | null>(null);
 
   const [abaAtiva, setAbaAtiva] = useState<string>("lagoa");
   const abaAtivaRef = useRef<string>("lagoa");
@@ -135,10 +103,62 @@ export default function ChatPage() {
 
   const [texto, setTexto] = useState("");
   const [imagemBase64, setImagemBase64] = useState<string | null>(null);
-  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // ======= RINGTONES =======
+  const [editandoNome, setEditandoNome] = useState<string | null>(null);
+  const [nomePrivadoInput, setNomePrivadoInput] = useState<string>("");
+
+  // ====== LÓGICA DO TIMER VISUAL DA LAGOA ======
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (lagoaAtiva) {
+      setTempoRestante(360); // 6 minutos = 360 segundos
+      interval = setInterval(() => {
+        setTempoRestante((prev) => {
+          if (prev !== null && prev > 0) return prev - 1;
+          return 0;
+        });
+      }, 1000);
+    } else {
+      setTempoRestante(null);
+    }
+    return () => clearInterval(interval);
+  }, [lagoaAtiva]);
+
+  // ====== MOTOR DE ÁUDIO NATIVO E GARANTIDO ======
+  const capturarAudioNativo = async (): Promise<MediaStream> => {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+  };
+
+  const alternarTesteMic = async () => {
+    if (testandoMic) {
+      if (testStreamRef.current) testStreamRef.current.getTracks().forEach(t => t.stop());
+      if (testAudioRef.current) testAudioRef.current.srcObject = null;
+      setTestandoMic(false);
+    } else {
+      try {
+        const stream = await capturarAudioNativo();
+        testStreamRef.current = stream;
+        if (testAudioRef.current) testAudioRef.current.srcObject = stream;
+        setTestandoMic(true);
+      } catch (err) {
+        alert("Permissão de microfone negada.");
+      }
+    }
+  };
+
+  const fecharModalPerfil = () => {
+    if (testandoMic) alternarTesteMic();
+    setModalPerfilAberto(false);
+  };
+
+  // ====== RINGTONES ======
   const tocarRingtone = (tipo: 'chamando' | 'recebendo') => {
     pararRingtone();
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -148,14 +168,11 @@ export default function ChatPage() {
       if (ctx.state === "closed") return;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
       osc.type = tipo === 'chamando' ? 'sine' : 'triangle';
       osc.frequency.setValueAtTime(tipo === 'chamando' ? 440 : 600, ctx.currentTime);
       if (tipo === 'recebendo') osc.frequency.setValueAtTime(800, ctx.currentTime + 0.15);
-
       gain.gain.setValueAtTime(0.05, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start();
@@ -168,189 +185,9 @@ export default function ChatPage() {
 
   const pararRingtone = () => {
     if (ringtoneIntervalRef.current) clearInterval(ringtoneIntervalRef.current);
-    if (ringtoneCtxRef.current && ringtoneCtxRef.current.state !== "closed") {
-      ringtoneCtxRef.current.close();
-    }
+    if (ringtoneCtxRef.current && ringtoneCtxRef.current.state !== "closed") ringtoneCtxRef.current.close();
     ringtoneIntervalRef.current = null;
     ringtoneCtxRef.current = null;
-  };
-
-  // ======= MOTOR DE ÁUDIO =======
-  const capturarAudioFiltroSupremo = async (isTest = false): Promise<MediaStream> => {
-    const webrtcConstraints = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: false,
-      sampleRate: 48000,
-      channelCount: 1,
-      ...({
-        googEchoCancellation: true,
-        googNoiseSuppression: true,
-        googHighpassFilter: true,
-        googTypingNoiseDetection: true
-      } as any)
-    };
-
-    const rawStream = await navigator.mediaDevices.getUserMedia({ audio: webrtcConstraints });
-
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      if (isTest) testAudioContextRef.current = audioCtx;
-      else audioContextRef.current = audioCtx;
-
-      const source = audioCtx.createMediaStreamSource(rawStream);
-
-      const inputGainNode = audioCtx.createGain();
-      inputGainNode.gain.value = volumeEntradaRef.current / 100;
-      if (isTest) testInputGainNodeRef.current = inputGainNode;
-      else inputGainNodeRef.current = inputGainNode;
-
-      const hp1 = audioCtx.createBiquadFilter(); hp1.type = "highpass"; hp1.frequency.value = 180;
-      const hp2 = audioCtx.createBiquadFilter(); hp2.type = "highpass"; hp2.frequency.value = 180;
-      const hp3 = audioCtx.createBiquadFilter(); hp3.type = "highpass"; hp3.frequency.value = 180;
-
-      const lp = audioCtx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3000;
-
-      const compressor = audioCtx.createDynamicsCompressor();
-      compressor.threshold.setValueAtTime(-15, audioCtx.currentTime);
-      compressor.knee.setValueAtTime(0, audioCtx.currentTime);
-      compressor.ratio.setValueAtTime(15, audioCtx.currentTime);
-      compressor.attack.setValueAtTime(0.001, audioCtx.currentTime);
-      compressor.release.setValueAtTime(0.1, audioCtx.currentTime);
-
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.5;
-      analyser.minDecibels = -90; 
-      analyser.maxDecibels = -10; 
-
-      const gateNode = audioCtx.createGain();
-      gateNode.gain.value = 0; 
-
-      const destination = audioCtx.createMediaStreamDestination();
-
-      source.connect(inputGainNode);
-      inputGainNode.connect(hp1);
-      hp1.connect(hp2);
-      hp2.connect(hp3);
-      hp3.connect(lp);
-      lp.connect(compressor);
-      compressor.connect(analyser);
-      analyser.connect(gateNode);
-      gateNode.connect(destination);
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      
-      let holdTimer = 0;
-      let isGateOpen = false;
-
-      const checkAudioLevel = () => {
-        const currentCtx = isTest ? testAudioContextRef.current : audioContextRef.current;
-        if (!currentCtx || currentCtx.state === "closed") return;
-        
-        analyser.getByteFrequencyData(dataArray);
-        
-        let maxVolume = 0;
-        for (let i = 3; i < 35; i++) {
-          if (dataArray[i] > maxVolume) {
-            maxVolume = dataArray[i];
-          }
-        }
-        
-        const volumeAtual = (maxVolume / 255) * 100;
-
-        if (isTest || (!isTest && !testandoMic)) {
-          const barVisual = document.getElementById("volume-bar-visual");
-          if (barVisual) {
-            barVisual.style.width = `${volumeAtual}%`;
-            barVisual.style.backgroundColor = volumeAtual > sensibilidadeRef.current ? "#10b981" : "#f43f5e"; 
-          }
-        }
-
-        const passouSensibilidade = volumeAtual > sensibilidadeRef.current;
-        const usuarioMutadoManual = microfoneMutadoRef.current && !isTest; 
-
-        if (passouSensibilidade && !usuarioMutadoManual) {
-          holdTimer = 25; 
-          if (!isGateOpen) {
-            isGateOpen = true;
-            gateNode.gain.cancelScheduledValues(currentCtx.currentTime);
-            gateNode.gain.setValueAtTime(gateNode.gain.value, currentCtx.currentTime);
-            gateNode.gain.linearRampToValueAtTime(1, currentCtx.currentTime + 0.05); 
-          }
-        } else {
-          if (holdTimer > 0 && !usuarioMutadoManual) {
-            holdTimer--; 
-          } else if (isGateOpen) {
-            isGateOpen = false;
-            gateNode.gain.cancelScheduledValues(currentCtx.currentTime);
-            gateNode.gain.setValueAtTime(gateNode.gain.value, currentCtx.currentTime);
-            gateNode.gain.linearRampToValueAtTime(0, currentCtx.currentTime + 0.1); 
-          }
-        }
-
-        if (isTest) {
-          testAnimationFrameRef.current = requestAnimationFrame(checkAudioLevel);
-        } else {
-          animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
-        }
-      };
-
-      checkAudioLevel();
-      return destination.stream;
-
-    } catch (e) {
-      console.warn("Filtro Supremo falhou.", e);
-      return rawStream;
-    }
-  };
-
-  const alternarTesteMic = async () => {
-    if (testandoMic) {
-      pararTesteMic();
-    } else {
-      try {
-        const stream = await capturarAudioFiltroSupremo(true);
-        testStreamRef.current = stream;
-        if (testAudioRef.current) {
-          testAudioRef.current.srcObject = stream;
-          testAudioRef.current.volume = volumeSaida / 100;
-        }
-        setTestandoMic(true);
-      } catch (err) {
-        alert("Permissão de microfone negada para o teste.");
-      }
-    }
-  };
-
-  const pararTesteMic = () => {
-    if (testAnimationFrameRef.current) {
-      cancelAnimationFrame(testAnimationFrameRef.current);
-      testAnimationFrameRef.current = null;
-    }
-    if (testStreamRef.current) {
-      testStreamRef.current.getTracks().forEach(t => t.stop());
-      testStreamRef.current = null;
-    }
-    if (testAudioContextRef.current) {
-      testAudioContextRef.current.close();
-      testAudioContextRef.current = null;
-    }
-    if (testAudioRef.current) {
-      testAudioRef.current.srcObject = null;
-    }
-    setTestandoMic(false);
-    
-    if (!chamadaAtiva) {
-      const barVisual = document.getElementById("volume-bar-visual");
-      if (barVisual) barVisual.style.width = "0%";
-    }
-  };
-
-  const fecharModalPerfil = () => {
-    pararTesteMic();
-    setModalPerfilAberto(false);
   };
 
   useEffect(() => {
@@ -359,267 +196,153 @@ export default function ChatPage() {
     }
   }, [privados]);
 
-  // ======= SOCKET CONEXÃO ÚNICA (SEM RE-TRIGGER POR ABA OU LAGOAID) =======
+  // ====== SOCKET CONEXÃO ======
   useEffect(() => {
     const socket = io();
     socketRef.current = socket;
 
-    privados.forEach((chat) => {
-      socket.emit("entrar_sala_privada", { novaSalaPrivada: chat.id });
-    });
+    privados.forEach((chat) => socket.emit("entrar_sala_privada", { novaSalaPrivada: chat.id }));
 
     socket.on("aguardando_parceiro", () => {
-      setProcurando(true);
-      setLagoaPendente(null);
-      setLagoaAtiva(false);
-      setConfirmados(0);
-      setJaAceitou(false);
+      setProcurando(true); setLagoaPendente(null); setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false);
     });
 
     socket.on("parceiro_encontrado", (data) => {
-      setProcurando(false);
-      setLagoaId(data.salaId);
-      setLagoaPendente(data.salaId);
-      setMeuNomeAnon(data.meuNome);
-      setParceiroNomeAnon(data.parceiroNome);
-      setLagoaAtiva(false);
-      setConfirmados(0);
-      setJaAceitou(false);
+      setProcurando(false); setLagoaId(data.salaId); setLagoaPendente(data.salaId);
+      setMeuNomeAnon(data.meuNome); setParceiroNomeAnon(data.parceiroNome);
+      setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false);
     });
 
-    socket.on("atualizar_confirmacao", (data: { confirmados: number }) => {
-      setConfirmados(data.confirmados);
+    socket.on("atualizar_confirmacao", (data) => setConfirmados(data.confirmados));
+
+    socket.on("conexao_confirmada", (data) => {
+      setLagoaId(data.salaId); setLagoaAtiva(true); setLagoaPendente(null);
+      setLagoaMensagens([]); setConfirmados(2);
     });
 
-    socket.on("conexao_confirmada", (data: { salaId: string }) => {
-      setLagoaId(data.salaId);
-      setLagoaAtiva(true);
-      setLagoaPendente(null);
-      setLagoaMensagens([]);
-      setConfirmados(2);
+    // RECEBE EVENTO DE FECHAR A LAGOA DO SERVIDOR
+    socket.on("tempo_esgotado", () => {
+      alert("O tempo limite (6 min) foi atingido. A lagoa fechou!");
+      sairDaLagoa(true);
     });
 
     socket.on("receber_mensagem", (data: Mensagem & { salaId: string }) => {
       const novaMsg = { id: data.id, usuario: data.usuario, mensagem: data.mensagem, imagem: data.imagem, audio: data.audio, hora: data.hora };
       if (data.salaId.startsWith("ninho_")) {
-        setPrivados((prev) => prev.map(chat => 
-          chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg] } : chat
-        ));
+        setPrivados((prev) => prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg] } : chat));
       } else {
         setLagoaMensagens((prev) => [...prev, novaMsg]);
       }
     });
 
-    socket.on("mensagem_apagada", (data: { salaId: string; msgId: string }) => {
+    socket.on("mensagem_apagada", (data) => {
       if (data.salaId.startsWith("ninho_")) {
-        setPrivados((prev) => prev.map(chat => 
-          chat.id === data.salaId ? { ...chat, mensagens: chat.mensagens.filter(m => m.id !== data.msgId) } : chat
-        ));
+        setPrivados((prev) => prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: chat.mensagens.filter(m => m.id !== data.msgId) } : chat));
       } else {
         setLagoaMensagens((prev) => prev.filter(m => m.id !== data.msgId));
       }
     });
 
-    socket.on("recebeu_chamada_voz", () => {
-      setChamadaRecebida(true);
-      tocarRingtone('recebendo');
-    });
+    socket.on("recebeu_chamada_voz", () => { setChamadaRecebida(true); tocarRingtone('recebendo'); });
+    socket.on("chamada_voz_aceita_pelo_parceiro", async () => { pararRingtone(); setChamadaAtiva(true); setStatusConvite(null); await enviarOfertaWebRTC(); });
 
-    socket.on("chamada_voz_aceita_pelo_parceiro", async () => {
-      pararRingtone();
-      setChamadaAtiva(true);
-      setStatusConvite(null);
-      await enviarOfertaWebRTC();
-    });
-
-    socket.on("webrtc_offer", async (data: { offer: RTCSessionDescriptionInit }) => {
+    socket.on("webrtc_offer", async (data) => {
       try {
         const pc = obterOuCriarPeerConnection();
         await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-
-        const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
-        socketRef.current?.emit("webrtc_answer", { salaId: salaAlvo, answer });
+        socketRef.current?.emit("webrtc_answer", { salaId: abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current, answer });
         setChamadaAtiva(true);
-      } catch (err) {
-        console.error("Erro ao processar oferta:", err);
-      }
+      } catch (err) {}
     });
 
-    socket.on("webrtc_answer", async (data: { answer: RTCSessionDescriptionInit }) => {
-      if (peerConnectionRef.current) {
-        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-        setChamadaAtiva(true);
-      }
+    socket.on("webrtc_answer", async (data) => {
+      if (peerConnectionRef.current) { await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); setChamadaAtiva(true); }
     });
 
-    socket.on("webrtc_ice_candidate", async (data: { candidate: RTCIceCandidateInit }) => {
-      if (peerConnectionRef.current && data.candidate) {
-        try {
-          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch {}
-      }
+    socket.on("webrtc_ice_candidate", async (data) => {
+      if (peerConnectionRef.current && data.candidate) { try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch {} }
     });
 
-    socket.on("chamada_voz_recusada", () => {
-      pararRingtone();
-      alert("O outro pato recusou a chamada.");
-      encerrarChamadaLocal();
-    });
+    socket.on("chamada_voz_recusada", () => { pararRingtone(); alert("O outro pato recusou a chamada."); encerrarChamadaLocal(); });
+    socket.on("chamada_voz_encerrada", () => { pararRingtone(); encerrarChamadaLocal(); });
 
-    socket.on("chamada_voz_encerrada", () => {
-      pararRingtone();
-      encerrarChamadaLocal();
-    });
-
-    socket.on("recebeu_convite_privado", (data) => {
-      setConvitePendente(data.solicitante);
-      setStatusConvite(null);
-    });
+    socket.on("recebeu_convite_privado", (data) => { setConvitePendente(data.solicitante); setStatusConvite(null); });
 
     socket.on("migrar_para_privado", (data) => {
       const novaId = data.novaSalaPrivada;
       socket.emit("entrar_sala_privada", { novaSalaPrivada: novaId });
-
       setPrivados((prev) => {
         if (prev.some(p => p.id === novaId)) return prev;
-        return [
-          ...prev, 
-          {
-            id: novaId,
-            mensagens: [{
-              id: `sys_${Date.now()}`,
-              usuario: "SISTEMA 🔒",
-              mensagem: `Vocês entraram em um Ninho Privado! Suas identidades foram reveladas.`,
-              hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            }]
-          }
-        ];
+        return [...prev, { id: novaId, mensagens: [{ id: `sys_${Date.now()}`, usuario: "SISTEMA 🔒", mensagem: `Vocês entraram em um Ninho Privado! Suas identidades foram reveladas.`, hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }] }];
       });
-
-      setAbaAtiva(novaId);
-      setLagoaAtiva(false);
-      setConvitePendente(null);
-      setStatusConvite(null);
+      setAbaAtiva(novaId); setLagoaAtiva(false); setConvitePendente(null); setStatusConvite(null);
     });
 
-    socket.on("convite_privado_recusado", () => {
-      setStatusConvite("O outro pato recusou o convite.");
-      setTimeout(() => setStatusConvite(null), 3000);
-    });
+    socket.on("convite_privado_recusado", () => { setStatusConvite("O outro pato recusou o convite."); setTimeout(() => setStatusConvite(null), 3000); });
 
     socket.on("parceiro_desconectou", () => {
-      pararRingtone();
-      setLagoaAtiva(false);
-      setLagoaId(null);
-      setLagoaPendente(null);
-      setProcurando(false);
-      setJaAceitou(false);
-      setConfirmados(0);
-      encerrarChamadaLocal();
+      pararRingtone(); setLagoaAtiva(false); setLagoaId(null); setLagoaPendente(null); setProcurando(false); setJaAceitou(false); setConfirmados(0); encerrarChamadaLocal();
     });
 
-    return () => {
-      pararRingtone();
-      pararTesteMic();
-      socket.disconnect();
-    };
+    return () => { pararRingtone(); if(testandoMic) alternarTesteMic(); socket.disconnect(); };
   }, []);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [lagoaMensagens, privados, abaAtiva]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [lagoaMensagens, privados, abaAtiva]);
 
+  // ====== WEBRTC E CHAMADAS ======
   const obterOuCriarPeerConnection = () => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
-
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" }
-      ]
-    });
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
-        socketRef.current?.emit("webrtc_ice_candidate", { salaId: salaAlvo, candidate: e.candidate });
-      }
-    };
-
-    pc.ontrack = (e) => {
-      if (remoteAudioRef.current && e.streams[0]) {
-        remoteAudioRef.current.srcObject = e.streams[0];
-      }
-    };
-
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }] });
+    pc.onicecandidate = (e) => { if (e.candidate) socketRef.current?.emit("webrtc_ice_candidate", { salaId: abaAtiva !== "lagoa" ? abaAtiva : lagoaId, candidate: e.candidate }); };
+    pc.ontrack = (e) => { if (remoteAudioRef.current && e.streams[0]) remoteAudioRef.current.srcObject = e.streams[0]; };
     peerConnectionRef.current = pc;
     return pc;
   };
 
   const solicitarChamadaVoz = () => {
-    const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
-    if (!salaAlvo) return;
-
-    socketRef.current?.emit("iniciar_chamada_voz", { salaId: salaAlvo });
+    if (abaAtiva === "lagoa") return; // Garante que não chame na lagoa
+    socketRef.current?.emit("iniciar_chamada_voz", { salaId: abaAtiva });
     setStatusConvite("Chamando Pato... 📞");
     tocarRingtone('chamando');
   };
 
   const atenderChamadaVoz = async () => {
     pararRingtone();
-    const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
-    if (!salaAlvo) return;
-
+    if (abaAtiva === "lagoa") return;
     try {
-      const stream = await capturarAudioFiltroSupremo(false);
+      const stream = await capturarAudioNativo();
       localStreamRef.current = stream;
-
       const pc = obterOuCriarPeerConnection();
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-      socketRef.current?.emit("aceitar_chamada_voz", { salaId: salaAlvo });
-      setChamadaRecebida(false);
-      setChamadaAtiva(true);
-    } catch {
-      alert("Microfone não encontrado ou permissão negada.");
-    }
+      socketRef.current?.emit("aceitar_chamada_voz", { salaId: abaAtiva });
+      setChamadaRecebida(false); setChamadaAtiva(true);
+    } catch { alert("Microfone não encontrado ou permissão negada."); }
   };
 
   const enviarOfertaWebRTC = async () => {
-    const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
-    if (!salaAlvo) return;
-
+    if (abaAtiva === "lagoa") return;
     try {
-      const stream = await capturarAudioFiltroSupremo(false);
+      const stream = await capturarAudioNativo();
       localStreamRef.current = stream;
-
       const pc = obterOuCriarPeerConnection();
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-
-      socketRef.current?.emit("webrtc_offer", { salaId: salaAlvo, offer });
-    } catch {
-      alert("Microfone não encontrado ou permissão negada.");
-    }
+      socketRef.current?.emit("webrtc_offer", { salaId: abaAtiva, offer });
+    } catch { alert("Microfone não encontrado ou permissão negada."); }
   };
 
-  const recusarChamadaVoz = () => {
-    pararRingtone();
-    const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
-    if (salaAlvo) socketRef.current?.emit("recusar_chamada_voz", { salaId: salaAlvo });
-    setChamadaRecebida(false);
-  };
+  const recusarChamadaVoz = () => { pararRingtone(); if (abaAtiva !== "lagoa") socketRef.current?.emit("recusar_chamada_voz", { salaId: abaAtiva }); setChamadaRecebida(false); };
 
   const alternarMuteMicrofone = () => {
     setMicrofoneMutado((prev) => {
       const novo = !prev;
-      if (!novo && audioMutado) {
-        setAudioMutado(false);
+      if (localStreamRef.current) {
+        localStreamRef.current.getAudioTracks().forEach(track => track.enabled = !novo); // Muta fisicamente a faixa de áudio
       }
+      if (!novo && audioMutado) setAudioMutado(false);
       return novo;
     });
   };
@@ -627,128 +350,47 @@ export default function ChatPage() {
   const alternarAudioMutado = () => {
     setAudioMutado((prev) => {
       const novo = !prev;
-      if (novo) {
-        setMicrofoneMutado(true);
-      }
+      if (novo && !microfoneMutado) alternarMuteMicrofone(); // Se ensurdece, muta o mic também
       return novo;
     });
   };
 
   const encerrarChamadaLocal = () => {
     pararRingtone();
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(t => t.stop());
-      localStreamRef.current = null;
-    }
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    setChamadaAtiva(false);
-    setChamadaRecebida(false);
-    setMicrofoneMutado(false);
-    setAudioMutado(false);
-    setStatusConvite(null);
-    
-    const barVisual = document.getElementById("volume-bar-visual");
-    if (barVisual && !testandoMic) barVisual.style.width = "0%";
+    if (peerConnectionRef.current) { peerConnectionRef.current.close(); peerConnectionRef.current = null; }
+    if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
+    setChamadaAtiva(false); setChamadaRecebida(false); setMicrofoneMutado(false); setAudioMutado(false); setStatusConvite(null);
   };
 
-  const desligarChamada = () => {
-    pararRingtone();
-    const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
-    if (salaAlvo) socketRef.current?.emit("encerrar_chamada_voz", { salaId: salaAlvo });
-    encerrarChamadaLocal();
-  };
+  const desligarChamada = () => { pararRingtone(); if (abaAtiva !== "lagoa") socketRef.current?.emit("encerrar_chamada_voz", { salaId: abaAtiva }); encerrarChamadaLocal(); };
 
-  const alternarGravacaoAudioMsg = async () => {
-    if (gravandoAudioMsg) {
-      msgMediaRecorderRef.current?.stop();
-      setGravandoAudioMsg(false);
-    } else {
-      try {
-        const stream = await capturarAudioFiltroSupremo(false);
-
-        const options = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-          ? { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: 128000 }
-          : undefined;
-
-        const recorder = new MediaRecorder(stream, options);
-        msgMediaRecorderRef.current = recorder;
-        audioChunksRef.current = [];
-
-        recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
-
-        recorder.onstop = () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
-          const reader = new FileReader();
-          reader.onloadend = () => enviarAudioMsg(reader.result as string);
-          reader.readAsDataURL(audioBlob);
-          stream.getTracks().forEach((track) => track.stop());
-        };
-
-        recorder.start();
-        setGravandoAudioMsg(true);
-      } catch {
-        alert("Permissão de microfone negada.");
-      }
-    }
-  };
-
-  const enviarAudioMsg = (audioBase64: string) => {
-    const isPrivado = abaAtiva !== "lagoa";
-    const salaAlvo = isPrivado ? abaAtiva : lagoaId;
-    if (!salaAlvo) return;
-
-    const remetente = isPrivado ? `${meuAvatar} ${meuNomeReal}` : meuNomeAnon;
-
-    socketRef.current?.emit("enviar_mensagem", {
-      salaId: salaAlvo,
-      remetenteNome: remetente,
-      mensagem: "🎤 Mensagem de áudio",
-      audio: audioBase64
-    });
-  };
-
+  // ====== FUNÇÕES DA UI ======
   const procurarPato = () => { setProcurando(true); socketRef.current?.emit("procurar_parceiro"); };
-  
-  // CORREÇÃO CRÍTICA DO ACEITE DE CONEXÃO
-  const aceitarConexao = () => { 
-    if (lagoaPendente && !jaAceitou) { 
-      setJaAceitou(true); 
-      socketRef.current?.emit("confirmar_conexao", { salaId: lagoaPendente }); 
-    } 
-  };
-  
+  const aceitarConexao = () => { if (lagoaPendente && !jaAceitou) { setJaAceitou(true); socketRef.current?.emit("confirmar_conexao", { salaId: lagoaPendente }); } };
   const recusarConexao = () => { setLagoaPendente(null); setJaAceitou(false); setConfirmados(0); procurarPato(); };
-  
   const solicitarPrivado = () => { if (!lagoaId) return; setStatusConvite("Convite enviado! Aguardando..."); socketRef.current?.emit("solicitar_chat_privado", { salaId: lagoaId, meuNome: meuNomeAnon }); };
   const responderConvite = (aceito: boolean) => { if (!lagoaId) return; socketRef.current?.emit("responder_convite_privado", { salaId: lagoaId, aceito }); setConvitePendente(null); };
+
+  const sairDaLagoa = (forcado = false) => {
+    socketRef.current?.emit("sair_da_lagoa");
+    encerrarChamadaLocal();
+    setLagoaAtiva(false);
+    setLagoaId(null);
+    setConfirmados(0);
+    setTempoRestante(null);
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
+        const img = new Image(); img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 800;
-          const scaleSize = MAX_WIDTH / img.width;
-          canvas.width = Math.min(img.width, MAX_WIDTH);
-          canvas.height = img.height * (img.width > MAX_WIDTH ? scaleSize : 1);
-
-          const ctx = canvas.getContext("2d");
-          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const MAX_WIDTH = 800; const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = Math.min(img.width, MAX_WIDTH); canvas.height = img.height * (img.width > MAX_WIDTH ? scaleSize : 1);
+          const ctx = canvas.getContext("2d"); ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
           setImagemBase64(canvas.toDataURL("image/jpeg", 0.7));
         };
       };
@@ -756,32 +398,45 @@ export default function ChatPage() {
     }
   };
 
-  const apagarMensagem = (msgId: string) => {
-    const isPrivado = abaAtiva !== "lagoa";
-    const salaAlvo = isPrivado ? abaAtiva : lagoaId;
-    if (!salaAlvo) return;
-    socketRef.current?.emit("apagar_mensagem", { salaId: salaAlvo, msgId });
+  const alternarGravacaoAudioMsg = async () => {
+    if (gravandoAudioMsg) {
+      msgMediaRecorderRef.current?.stop(); setGravandoAudioMsg(false);
+    } else {
+      try {
+        const stream = await capturarAudioNativo();
+        const options = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: 128000 } : undefined;
+        const recorder = new MediaRecorder(stream, options);
+        msgMediaRecorderRef.current = recorder;
+        audioChunksRef.current = [];
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+        recorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
+            if (salaAlvo) socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: abaAtiva !== "lagoa" ? `${meuAvatar} ${meuNomeReal}` : meuNomeAnon, mensagem: "🎤 Mensagem de áudio", audio: reader.result as string });
+          };
+          reader.readAsDataURL(audioBlob);
+          stream.getTracks().forEach((track) => track.stop());
+        };
+        recorder.start();
+        setGravandoAudioMsg(true);
+      } catch { alert("Permissão de microfone negada."); }
+    }
   };
 
   const enviarMensagem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!texto.trim() && !imagemBase64) return;
-
-    const isPrivado = abaAtiva !== "lagoa";
-    const salaAlvo = isPrivado ? abaAtiva : lagoaId;
+    const isPrivado = abaAtiva !== "lagoa"; const salaAlvo = isPrivado ? abaAtiva : lagoaId;
     if (!salaAlvo) return;
+    socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: isPrivado ? `${meuAvatar} ${meuNomeReal}` : meuNomeAnon, mensagem: texto, imagem: isPrivado ? imagemBase64 : null });
+    setTexto(""); setImagemBase64(null);
+  };
 
-    const remetente = isPrivado ? `${meuAvatar} ${meuNomeReal}` : meuNomeAnon;
-
-    socketRef.current?.emit("enviar_mensagem", {
-      salaId: salaAlvo,
-      remetenteNome: remetente,
-      mensagem: texto,
-      imagem: isPrivado ? imagemBase64 : null
-    });
-
-    setTexto("");
-    setImagemBase64(null);
+  const apagarMensagem = (msgId: string) => {
+    const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
+    if (salaAlvo) socketRef.current?.emit("apagar_mensagem", { salaId: salaAlvo, msgId });
   };
 
   const isLagoa = abaAtiva === "lagoa";
@@ -789,225 +444,34 @@ export default function ChatPage() {
 
   return (
     <div className="app-layout">
-      {/* REPRODUTORES DE ÁUDIO INVISÍVEIS */}
       <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
       <audio ref={testAudioRef} autoPlay muted={false} style={{ display: 'none' }} />
 
-      {/* ESTILOS CUSTOMIZADOS PARA O MODAL E PAINEL DISCORD */}
       <style dangerouslySetInnerHTML={{__html: `
-        .discord-slider {
-          -webkit-appearance: none;
-          width: 100%;
-          background: transparent;
-        }
-        .discord-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          background: #fff;
-          border-radius: 50%;
-          cursor: pointer;
-          box-shadow: 0 0 5px rgba(0,0,0,0.5);
-          margin-top: -5px;
-          transition: transform 0.1s;
-        }
-        .discord-slider::-webkit-slider-thumb:hover {
-          transform: scale(1.2);
-        }
-        .discord-slider::-webkit-slider-runnable-track {
-          width: 100%;
-          height: 6px;
-          cursor: pointer;
-          background: transparent;
-        }
-
-        .discord-call-panel-v2 {
-          background-color: #111214;
-          border: 1px solid #1e1f22;
-          border-radius: 8px;
-          padding: 12px 16px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 16px;
-        }
-        .d-call-info {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-        .d-call-dot {
-          width: 12px;
-          height: 12px;
-          background-color: #23a559;
-          border-radius: 50%;
-          box-shadow: 0 0 8px rgba(35, 165, 89, 0.6);
-          animation: pulse-green 2s infinite;
-        }
-        @keyframes pulse-green {
-          0% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.4); }
-          70% { box-shadow: 0 0 0 6px rgba(35, 165, 89, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0); }
-        }
-        .d-call-text {
-          display: flex;
-          flex-direction: column;
-        }
-        .d-call-title {
-          color: #23a559;
-          font-weight: 700;
-          font-size: 14px;
-        }
-        .d-call-subtitle {
-          color: #949ba4;
-          font-size: 12px;
-          font-weight: 500;
-        }
-        .d-call-actions {
-          display: flex;
-          gap: 12px;
-        }
-        .d-action-btn {
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          background-color: #2b2d31;
-          border: 1px solid transparent;
-          color: #dbdee1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 18px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          position: relative;
-        }
-        .d-action-btn:hover {
-          background-color: #313338;
-          transform: translateY(-2px);
-          border-color: #dbdee1;
-        }
-        .d-action-btn.btn-muted {
-          background-color: #da373c;
-          color: #fff;
-        }
-        .d-action-btn.btn-muted:hover {
-          background-color: #c93035;
-          border-color: transparent;
-        }
-        .d-action-btn.btn-disconnect {
-          background-color: #da373c;
-          color: #fff;
-          border-radius: 24px;
-          width: auto;
-          padding: 0 16px;
-          font-size: 14px;
-          font-weight: 700;
-          gap: 8px;
-        }
-        .d-action-btn.btn-disconnect:hover {
-          background-color: #c93035;
-          border-color: transparent;
-        }
-
-        .d-action-btn::after {
-          content: attr(data-tooltip);
-          position: absolute;
-          bottom: -34px;
-          background: #111214;
-          color: #dbdee1;
-          padding: 6px 10px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          white-space: nowrap;
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 0.2s;
-          box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-          z-index: 100;
-        }
-        .d-action-btn:hover::after {
-          opacity: 1;
-        }
-
-        .pro-input {
-          width: 100%;
-          background: #121e24;
-          border: 1px solid #1f2d35;
-          color: #fff;
-          padding: 14px 16px;
-          border-radius: 12px;
-          font-size: 14px;
-          outline: none;
-          transition: all 0.2s ease;
-        }
-        .pro-input:focus {
-          border-color: #2dd4bf;
-          box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.1);
-        }
-        .pro-label {
-          font-size: 11px;
-          font-weight: 800;
-          color: #94a3b8;
-          letter-spacing: 0.8px;
-          text-transform: uppercase;
-        }
-        .avatar-btn {
-          font-size: 26px;
-          padding: 10px;
-          border-radius: 14px;
-          cursor: pointer;
-          background: #121e24;
-          border: 1px solid #1f2d35;
-          flex: 1;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .avatar-btn:hover {
-          background: #1a2830;
-          transform: translateY(-2px);
-        }
-        .avatar-btn.active {
-          background: rgba(45, 212, 191, 0.15);
-          border-color: #2dd4bf;
-          box-shadow: 0 4px 15px rgba(45, 212, 191, 0.2);
-          transform: scale(1.05);
-        }
-        .btn-test-mic {
-          width: 100%;
-          padding: 16px;
-          border-radius: 12px;
-          cursor: pointer;
-          font-weight: 800;
-          font-size: 14px;
-          transition: all 0.2s ease;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          border: 1px solid #1f2d35;
-          background: #121e24;
-          color: #f43f5e;
-        }
-        .btn-test-mic:hover {
-          background: rgba(244, 63, 94, 0.05);
-          border-color: rgba(244, 63, 94, 0.5);
-        }
-        .btn-test-mic.active {
-          border-color: #f43f5e;
-          background: rgba(244, 63, 94, 0.1);
-          color: #f43f5e;
-          animation: pulse-border 2s infinite;
-        }
-        .modal-body::-webkit-scrollbar { width: 6px; }
-        .modal-body::-webkit-scrollbar-thumb { background: #1f2d35; border-radius: 10px; }
+        .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
+        .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5); margin-top: -5px; }
+        .discord-slider::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: transparent; }
+        .discord-call-panel-v2 { background-color: #111214; border: 1px solid #1e1f22; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .d-call-info { display: flex; align-items: center; gap: 12px; }
+        .d-call-dot { width: 12px; height: 12px; background-color: #23a559; border-radius: 50%; box-shadow: 0 0 8px rgba(35, 165, 89, 0.6); animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(35, 165, 89, 0); } 100% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0); } }
+        .d-call-text { display: flex; flex-direction: column; }
+        .d-call-title { color: #23a559; font-weight: 700; font-size: 14px; }
+        .d-call-subtitle { color: #949ba4; font-size: 12px; font-weight: 500; }
+        .d-call-actions { display: flex; gap: 12px; }
+        .d-action-btn { width: 40px; height: 40px; border-radius: 50%; background-color: #2b2d31; border: 1px solid transparent; color: #dbdee1; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; }
+        .d-action-btn:hover { background-color: #313338; border-color: #dbdee1; }
+        .d-action-btn.btn-muted { background-color: #da373c; color: #fff; }
+        .d-action-btn.btn-disconnect { background-color: #da373c; color: #fff; border-radius: 24px; width: auto; padding: 0 16px; font-size: 14px; font-weight: 700; gap: 8px; }
+        .pro-input { width: 100%; background: #121e24; border: 1px solid #1f2d35; color: #fff; padding: 14px 16px; border-radius: 12px; font-size: 14px; outline: none; }
+        .pro-input:focus { border-color: #2dd4bf; box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.1); }
+        .pro-label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
+        .avatar-btn { font-size: 26px; padding: 10px; border-radius: 14px; cursor: pointer; background: #121e24; border: 1px solid #1f2d35; flex: 1; display: flex; justify-content: center; }
+        .avatar-btn.active { background: rgba(45, 212, 191, 0.15); border-color: #2dd4bf; }
+        .btn-test-mic { width: 100%; padding: 16px; border-radius: 12px; cursor: pointer; font-weight: 800; font-size: 14px; border: 1px solid #1f2d35; background: #121e24; color: #f43f5e; display: flex; justify-content: center; gap: 8px;}
+        .btn-test-mic.active { border-color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
       `}} />
 
-      {/* SIDEBAR INSTAGRAM DIRECT */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <Link href="/" style={{ textDecoration: 'none', color: '#fff' }}>←</Link>
@@ -1018,13 +482,11 @@ export default function ChatPage() {
           <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden" }}>
             <span style={{ fontSize: "24px" }}>{meuAvatar}</span>
             <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meuNomeReal}</span>
-              <span style={{ fontSize: "10px", color: "var(--teal-neon)", opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{meuStatusBio}</span>
+              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#fff" }}>{meuNomeReal}</span>
+              <span style={{ fontSize: "10px", color: "var(--teal-neon)", opacity: 0.8 }}>{meuStatusBio}</span>
             </div>
           </div>
-          <button onClick={() => setModalPerfilAberto(true)} className="back-btn" style={{ fontSize: "10px", padding: "4px 8px" }}>
-            Editar ⚙️
-          </button>
+          <button onClick={() => setModalPerfilAberto(true)} className="back-btn" style={{ fontSize: "10px", padding: "4px 8px" }}>Editar ⚙️</button>
         </div>
 
         <div className="chat-list">
@@ -1040,7 +502,7 @@ export default function ChatPage() {
             <div key={chat.id} className={`chat-item ${abaAtiva === chat.id ? "active" : ""}`} onClick={() => setAbaAtiva(chat.id)}>
               <div className="chat-item-avatar">🔒</div>
               <div className="chat-item-info">
-                <span className="chat-item-title">Ninho Privado {i + 1}</span>
+                <span className="chat-item-title">{chat.nomeCustom || `Ninho Privado ${i + 1}`}</span>
                 <span className="chat-item-sub">Bate-Papo Exclusivo</span>
               </div>
             </div>
@@ -1048,75 +510,92 @@ export default function ChatPage() {
         </div>
       </aside>
 
-      {/* CHAT PRINCIPAL */}
       <main className="main-chat-area">
         <header className="chat-header">
-          <div style={{ fontSize: "16px", fontWeight: "bold", color: "#fff" }}>
-            {isLagoa ? "Mergulho Anônimo" : "Ninho Privado"}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {editandoNome === abaAtiva && !isLagoa ? (
+              <input 
+                value={nomePrivadoInput} 
+                onChange={(e) => setNomePrivadoInput(e.target.value)}
+                onBlur={() => {
+                   setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
+                   setEditandoNome(null);
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                autoFocus
+                style={{ background: '#121e24', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '4px', padding: '4px 8px', outline: 'none' }}
+              />
+            ) : (
+              <span 
+                onClick={() => { if(!isLagoa) { setEditandoNome(abaAtiva); setNomePrivadoInput(privados.find(p => p.id === abaAtiva)?.nomeCustom || `Ninho Privado`); } }} 
+                style={{ cursor: isLagoa ? 'default' : 'pointer', fontSize: "16px", fontWeight: "bold", color: "#fff", display: 'flex', alignItems: 'center' }}
+              >
+                {isLagoa ? "Mergulho Anônimo" : (privados.find(p => p.id === abaAtiva)?.nomeCustom || "Ninho Privado")}
+                {!isLagoa && <span style={{fontSize: '12px', marginLeft: '6px', opacity: 0.5}}>✏️</span>}
+              </span>
+            )}
           </div>
+
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {(isLagoa ? lagoaAtiva : true) && !chamadaAtiva && (
+            {/* O BOTÃO DE CHAMADA SÓ APARECE EM NINHOS PRIVADOS */}
+            {!isLagoa && !chamadaAtiva && (
               <button onClick={solicitarChamadaVoz} className="btn-call-start">
                 📞 Iniciar Chamada
               </button>
             )}
+
             {isLagoa && lagoaAtiva && (
-              <button onClick={solicitarPrivado} className="back-btn" style={{ borderColor: "#2dd4bf", color: "#2dd4bf" }}>
-                Puxar p/ Privado 🔐
-              </button>
+              <>
+                <button onClick={solicitarPrivado} className="back-btn" style={{ borderColor: "#2dd4bf", color: "#2dd4bf" }}>Puxar p/ Privado 🔐</button>
+                <button onClick={() => sairDaLagoa(false)} className="back-btn" style={{ color: "#f43f5e", borderColor: "#f43f5e" }}>Sair 🚪</button>
+              </>
             )}
           </div>
         </header>
 
         <div className="chat-body">
-          {/* PAINEL CHAMADA ATIVA */}
-          {chamadaAtiva && (
+
+          {/* AVISO DO TIMER DA LAGOA NA TELA (SÓ APARECE QUANDO CONECTADO NA LAGOA) */}
+          {isLagoa && lagoaAtiva && tempoRestante !== null && (
+            <div style={{
+              backgroundColor: tempoRestante <= 60 ? 'rgba(244, 63, 94, 0.2)' : 'rgba(45, 212, 191, 0.1)',
+              border: `1px solid ${tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf'}`,
+              color: tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf',
+              padding: '10px',
+              textAlign: 'center',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              margin: '10px 16px',
+              borderRadius: '8px',
+              transition: 'all 0.3s'
+            }}>
+              {tempoRestante <= 60 ? "⚠️ ATENÇÃO: " : "⏳ "} A Lagoa fechará em {Math.floor(tempoRestante / 60)}:{(tempoRestante % 60).toString().padStart(2, '0')}. Se quiserem continuar, puxe para o Privado!
+            </div>
+          )}
+
+          {chamadaAtiva && !isLagoa && (
             <div className="discord-call-panel-v2">
               <div className="d-call-info">
                 <div className="d-call-dot"></div>
                 <div className="d-call-text">
                   <span className="d-call-title">Voz Conectada</span>
-                  <span className="d-call-subtitle">{isLagoa ? 'Lagoa Pública' : 'Ninho Privado'} • Filtro Ativo</span>
+                  <span className="d-call-subtitle">Ninho Privado • Filtro Nativo Ativo</span>
                 </div>
               </div>
-
               <div className="d-call-actions">
-                <button 
-                  onClick={() => setModalPerfilAberto(true)} 
-                  className="d-action-btn"
-                  data-tooltip="Configurações"
-                >
-                  ⚙️
-                </button>
-
-                <button 
-                  onClick={alternarMuteMicrofone} 
-                  className={`d-action-btn ${microfoneMutado ? "btn-muted" : ""}`}
-                  data-tooltip={microfoneMutado ? "Desmutar" : "Mutar"}
-                >
+                <button onClick={() => setModalPerfilAberto(true)} className="d-action-btn">⚙️</button>
+                <button onClick={alternarMuteMicrofone} className={`d-action-btn ${microfoneMutado ? "btn-muted" : ""}`}>
                   {microfoneMutado ? "🔇" : "🎙️"}
                 </button>
-
-                <button 
-                  onClick={alternarAudioMutado} 
-                  className={`d-action-btn ${audioMutado ? "btn-muted" : ""}`}
-                  data-tooltip={audioMutado ? "Escutar" : "Ensurdecer"}
-                >
+                <button onClick={alternarAudioMutado} className={`d-action-btn ${audioMutado ? "btn-muted" : ""}`}>
                   {audioMutado ? "🔕" : "🎧"}
                 </button>
-
-                <button 
-                  onClick={desligarChamada} 
-                  className="d-action-btn btn-disconnect"
-                >
-                  <span>☎️</span> Desconectar
-                </button>
+                <button onClick={desligarChamada} className="d-action-btn btn-disconnect"><span>☎️</span> Desconectar</button>
               </div>
             </div>
           )}
 
-          {/* PAINEL CHAMADA RECEBIDA */}
-          {chamadaRecebida && !chamadaAtiva && (
+          {chamadaRecebida && !chamadaAtiva && !isLagoa && (
             <div className="discord-call-panel-v2" style={{ borderLeft: '4px solid #23a559' }}>
               <div className="d-call-info">
                 <div className="d-call-dot" style={{animation: 'pulse-green 1s infinite'}}></div>
@@ -1125,23 +604,9 @@ export default function ChatPage() {
                   <span className="d-call-subtitle">O outro pato quer falar!</span>
                 </div>
               </div>
-
               <div className="d-call-actions">
-                <button 
-                  onClick={atenderChamadaVoz} 
-                  className="d-action-btn" 
-                  style={{backgroundColor: '#23a559', color: '#fff'}} 
-                  data-tooltip="Atender"
-                >
-                  📞
-                </button>
-                <button 
-                  onClick={recusarChamadaVoz} 
-                  className="d-action-btn btn-muted" 
-                  data-tooltip="Recusar"
-                >
-                  ✖️
-                </button>
+                <button onClick={atenderChamadaVoz} className="d-action-btn" style={{backgroundColor: '#23a559', color: '#fff'}}>📞</button>
+                <button onClick={recusarChamadaVoz} className="d-action-btn btn-muted">✖️</button>
               </div>
             </div>
           )}
@@ -1150,7 +615,7 @@ export default function ChatPage() {
             <div className="matching-card">
               <div className="duck-avatar">🎭</div>
               <h2 style={{ fontSize: "24px", fontWeight: "900", color: "#fff", marginBottom: "8px" }}>Lagoa Secreta</h2>
-              <p style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "24px" }}>A conversa inicial é 100% anônima.</p>
+              <p style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "24px" }}>A conversa é 100% anônima e limitada a 6 minutos.</p>
               <button onClick={procurarPato} className="btn-lagoa">ENTRAR NA ÁGUA 🚀</button>
             </div>
           )}
@@ -1202,9 +667,7 @@ export default function ChatPage() {
                     <div key={msg.id} className={`msg-wrapper ${eSistema ? "system-msg" : eMinha ? "my-msg" : "other-msg"}`}>
                       <div className="msg-header">
                         <span className="msg-meta">{msg.usuario} • {msg.hora}</span>
-                        {eMinha && !eSistema && (
-                          <button onClick={() => apagarMensagem(msg.id)} className="delete-btn" title="Apagar mensagem">🗑️</button>
-                        )}
+                        {eMinha && !eSistema && <button onClick={() => apagarMensagem(msg.id)} className="delete-btn">🗑️</button>}
                       </div>
                       <div className="msg-bubble">
                         {msg.mensagem}
@@ -1221,20 +684,17 @@ export default function ChatPage() {
                 {imagemBase64 && (
                   <div className="preview-container">
                     <img src={imagemBase64} alt="Preview" className="preview-img" />
-                    <span style={{ fontSize: "12px", color: "#2dd4bf" }}>Foto selecionada</span>
                     <button onClick={() => setImagemBase64(null)} style={{ background: "none", border: "none", color: "#f43f5e", cursor: "pointer", marginLeft: "auto" }}>✕</button>
                   </div>
                 )}
-
                 <form onSubmit={enviarMensagem} className="chat-input-area">
                   {!isLagoa && (
-                    <label className="attach-clip-btn" title="Anexar Foto">
-                      📎
-                      <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
+                    <label className="attach-clip-btn">
+                      📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
                     </label>
                   )}
                   <input type="text" className="chat-input" placeholder={gravandoAudioMsg ? "Gravando áudio..." : "Escreva sua mensagem..."} value={texto} onChange={(e) => setTexto(e.target.value)} disabled={gravandoAudioMsg} autoFocus />
-                  <button type="button" onClick={alternarGravacaoAudioMsg} className={`mic-btn ${gravandoAudioMsg ? "recording" : ""}`} title="Gravar Áudio">
+                  <button type="button" onClick={alternarGravacaoAudioMsg} className={`mic-btn ${gravandoAudioMsg ? "recording" : ""}`}>
                     {gravandoAudioMsg ? "🛑" : "🎙️"}
                   </button>
                   <button type="submit" className="send-btn">Enviar</button>
@@ -1245,193 +705,40 @@ export default function ChatPage() {
         </div>
       </main>
 
-      {/* MODAL PREMIUM DE CONFIGURAÇÕES */}
+      {/* MODAL DE PERFIL */}
       {modalPerfilAberto && (
-        <div 
-          onClick={fecharModalPerfil} 
-          style={{
-            position: 'fixed', inset: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 1000, padding: '16px'
-          }}
-        >
-          <div 
-            onClick={(e) => e.stopPropagation()} 
-            style={{
-              backgroundColor: '#0b141a',
-              borderRadius: '20px',
-              width: '100%',
-              maxWidth: '480px',
-              maxHeight: '90vh',
-              border: '1px solid #1f2d35',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.6)',
-              color: '#fff',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden'
-            }}
-          >
-            {/* CABEÇALHO FIXO COM X */}
-            <div style={{ 
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-              padding: '20px 24px', borderBottom: '1px solid #1f2d35', 
-              background: 'rgba(11, 20, 26, 0.95)', zIndex: 10
-            }}>
-              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                ⚙️ Configurações e Perfil
-              </h3>
-              <button 
-                onClick={fecharModalPerfil} 
-                title="Fechar"
-                style={{
-                  background: 'transparent', border: 'none', color: '#94a3b8',
-                  fontSize: '24px', cursor: 'pointer', transition: 'color 0.2s ease',
-                  padding: '4px', lineHeight: '1', display: 'flex', alignItems: 'center'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.color = '#f43f5e'}
-                onMouseOut={(e) => e.currentTarget.style.color = '#94a3b8'}
-              >
-                ✖
-              </button>
+        <div onClick={fecharModalPerfil} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '480px', maxHeight: '90vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid #1f2d35' }}>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>⚙️ Configurações</h3>
+              <button onClick={fecharModalPerfil} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>✖</button>
             </div>
             
-            {/* CORPO DO MODAL */}
             <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
-              
-              {/* SEÇÃO 1: PERFIL */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="pro-label">SEU NOME DE EXIBIÇÃO</label>
-                  <input 
-                    type="text" 
-                    value={meuNomeReal} 
-                    onChange={(e) => setMeuNomeReal(e.target.value)} 
-                    className="pro-input"
-                    placeholder="Como os patos te chamam?"
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="pro-label">STATUS/BIO DA LAGOA</label>
-                  <input 
-                    type="text" 
-                    value={meuStatusBio} 
-                    onChange={(e) => setMeuStatusBio(e.target.value)} 
-                    maxLength={50} 
-                    className="pro-input"
-                    placeholder="No que você está pensando?"
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <label className="pro-label">SEU AVATAR DA LAGOA</label>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    {["🦆", "🦅", "🦉", "🐧", "👑", "🚀"].map((emoji) => (
-                      <span 
-                        key={emoji} 
-                        onClick={() => setMeuAvatar(emoji)}
-                        className={`avatar-btn ${meuAvatar === emoji ? 'active' : ''}`}
-                      >
-                        {emoji}
-                      </span>
-                    ))}
-                  </div>
+                <label className="pro-label">SEU NOME DE EXIBIÇÃO</label>
+                <input type="text" value={meuNomeReal} onChange={(e) => setMeuNomeReal(e.target.value)} className="pro-input" />
+                <label className="pro-label">STATUS/BIO</label>
+                <input type="text" value={meuStatusBio} onChange={(e) => setMeuStatusBio(e.target.value)} maxLength={50} className="pro-input" />
+                <label className="pro-label">SEU AVATAR</label>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  {["🦆", "🦅", "🦉", "🐧", "👑", "🚀"].map((emoji) => (
+                    <span key={emoji} onClick={() => setMeuAvatar(emoji)} className={`avatar-btn ${meuAvatar === emoji ? 'active' : ''}`}>{emoji}</span>
+                  ))}
                 </div>
               </div>
-
               <div style={{ borderTop: "1px solid #1f2d35" }}></div>
-
-              {/* SEÇÃO 2: ÁUDIO */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                
-                {/* VOLUME ENTRADA */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <label className="pro-label" style={{ margin: 0 }}>VOLUME DE ENTRADA (MIC)</label>
-                    <span style={{ fontSize: '13px', color: '#2dd4bf', fontWeight: '900' }}>{volumeEntrada}%</span>
-                  </div>
-                  <input 
-                    type="range" min="0" max="200" value={volumeEntrada} 
-                    onChange={(e) => setVolumeEntrada(Number(e.target.value))} 
-                    className="discord-slider"
-                    style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                  />
-                  <p style={{ fontSize: '11px', color: '#64748b', margin: '6px 0 0 0' }}>Se você soprar muito forte e "estourar", diminua aqui.</p>
-                </div>
-
-                {/* VOLUME SAÍDA */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <label className="pro-label" style={{ margin: 0 }}>VOLUME DE SAÍDA (LIGAÇÃO)</label>
-                    <span style={{ fontSize: '13px', color: '#2dd4bf', fontWeight: '900' }}>{volumeSaida}%</span>
-                  </div>
-                  <input 
-                    type="range" min="0" max="100" value={volumeSaida} 
-                    onChange={(e) => setVolumeSaida(Number(e.target.value))} 
-                    className="discord-slider"
-                    style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                  />
-                </div>
-
-                {/* NOISE GATE */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <label className="pro-label" style={{ margin: 0 }}>SENSIBILIDADE (NOISE GATE)</label>
-                    <span style={{ fontSize: '13px', color: '#10b981', fontWeight: '900' }}>{sensibilidade}%</span>
-                  </div>
-                  
-                  <div style={{ 
-                    position: "relative", width: "100%", height: "26px", 
-                    background: "#121e24", borderRadius: "8px", overflow: "hidden", border: '1px solid #1f2d35'
-                  }}>
-                    <div id="volume-bar-visual" style={{ 
-                      position: "absolute", top: 0, left: 0, height: "100%", width: "0%", 
-                      background: "#f43f5e", transition: "width 0.05s ease-out, background-color 0.1s" 
-                    }}></div>
-                    <input 
-                      type="range" min="1" max="100" value={sensibilidade} 
-                      onChange={(e) => setSensibilidade(Number(e.target.value))} 
-                      className="discord-slider"
-                      style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", margin: 0, background: "transparent", zIndex: 10 }}
-                    />
-                  </div>
-                  <p style={{ fontSize: '12px', color: '#64748b', margin: '8px 0 0 0', lineHeight: '1.5' }}>
-                    Ative o teste de voz e fale. Arraste a linha branca para ficar um pouco acima do ruído ambiente, mas abaixo de quando você fala.
-                  </p>
-                </div>
-
-                {/* BOTÃO DE TESTE */}
-                <button 
-                  type="button"
-                  onClick={alternarTesteMic}
-                  className={`btn-test-mic ${testandoMic ? 'active' : ''}`}
-                >
-                  {testandoMic ? '🛑 Parar Teste de Voz' : '🎙️ Ouvir minha própria voz'}
+                <label className="pro-label">VOLUME DA CHAMADA (SAÍDA)</label>
+                <input type="range" min="0" max="100" value={volumeSaida} onChange={(e) => setVolumeSaida(Number(e.target.value))} className="discord-slider" />
+                <button type="button" onClick={alternarTesteMic} className={`btn-test-mic ${testandoMic ? 'active' : ''}`}>
+                  {testandoMic ? '🛑 Parar Teste de Voz' : '🎙️ Testar meu Microfone'}
                 </button>
               </div>
             </div>
-
-            {/* RODAPÉ FIXO */}
-            <div style={{ 
-              padding: '20px 24px', borderTop: '1px solid #1f2d35', 
-              background: 'rgba(11, 20, 26, 0.95)', zIndex: 10
-            }}>
-              <button 
-                onClick={fecharModalPerfil} 
-                style={{
-                  width: '100%', padding: '16px',
-                  background: 'linear-gradient(135deg, #2dd4bf, #10b981)',
-                  border: 'none', borderRadius: '12px', color: '#020d12',
-                  fontSize: '15px', fontWeight: '900', cursor: 'pointer',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  boxShadow: '0 4px 15px rgba(45, 212, 191, 0.3)'
-                }}
-                onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(45, 212, 191, 0.4)'; }}
-                onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(45, 212, 191, 0.3)'; }}
-              >
-                SALVAR CONFIGURAÇÕES 💾
+            <div style={{ padding: '20px 24px', borderTop: '1px solid #1f2d35' }}>
+              <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: '#2dd4bf', border: 'none', borderRadius: '12px', color: '#000', fontWeight: '900', cursor: 'pointer' }}>
+                SALVAR E FECHAR 💾
               </button>
             </div>
           </div>
