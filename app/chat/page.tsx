@@ -247,13 +247,20 @@ export default function ChatPage() {
 
     socket.on("webrtc_offer", async (data) => {
       try {
+        const stream = await capturarAudioNativo();
+        localStreamRef.current = stream;
         const pc = obterOuCriarPeerConnection();
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
         await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+        
         socketRef.current?.emit("webrtc_answer", { salaId: abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current, answer });
         setChamadaAtiva(true);
-      } catch (err) {}
+      } catch (err) {
+        console.error("Erro ao aceitar oferta WebRTC:", err);
+      }
     });
 
     socket.on("webrtc_answer", async (data) => {
@@ -290,7 +297,7 @@ export default function ChatPage() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [lagoaMensagens, privados, abaAtiva]);
 
-  // ====== WEBRTC E CHAMADAS (COM SERVIDOR TURN) ======
+  // ====== WEBRTC E CHAMADAS (COM SERVIDOR TURN & DESBLOQUEIO AUTO-PLAY) ======
   const obterOuCriarPeerConnection = () => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
@@ -328,7 +335,14 @@ export default function ChatPage() {
     pc.ontrack = (e) => {
       if (remoteAudioRef.current && e.streams[0]) {
         remoteAudioRef.current.srcObject = e.streams[0];
-        remoteAudioRef.current.play().catch((err) => console.log("Erro no play do áudio:", err));
+        const playPromise = remoteAudioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            window.addEventListener('click', () => {
+              remoteAudioRef.current?.play();
+            }, { once: true });
+          });
+        }
       }
     };
 
@@ -349,10 +363,13 @@ export default function ChatPage() {
     try {
       const stream = await capturarAudioNativo();
       localStreamRef.current = stream;
+      
       const pc = obterOuCriarPeerConnection();
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
       socketRef.current?.emit("aceitar_chamada_voz", { salaId: abaAtiva });
-      setChamadaRecebida(false); setChamadaAtiva(true);
+      setChamadaRecebida(false); 
+      setChamadaAtiva(true);
     } catch { alert("Microfone não encontrado ou permissão negada."); }
   };
 
@@ -361,10 +378,13 @@ export default function ChatPage() {
     try {
       const stream = await capturarAudioNativo();
       localStreamRef.current = stream;
+      
       const pc = obterOuCriarPeerConnection();
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+      
       socketRef.current?.emit("webrtc_offer", { salaId: abaAtiva, offer });
     } catch { alert("Microfone não encontrado ou permissão negada."); }
   };
@@ -479,8 +499,9 @@ export default function ChatPage() {
 
   return (
     <div className="app-layout">
-      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
-      <audio ref={testAudioRef} autoPlay muted={false} style={{ display: 'none' }} />
+      {/* REPRODUTORES DE ÁUDIO INVISÍVEIS (playsInline adicionado para iOS e Móbiles) */}
+      <audio ref={remoteAudioRef} autoPlay playsInline controls={false} style={{ display: 'none' }} />
+      <audio ref={testAudioRef} autoPlay playsInline muted={false} style={{ display: 'none' }} />
 
       <style dangerouslySetInnerHTML={{__html: `
         .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
