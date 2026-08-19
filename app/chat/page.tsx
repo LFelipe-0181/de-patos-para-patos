@@ -28,6 +28,9 @@ export default function ChatPage() {
   const [meuAvatar, setMeuAvatar] = useState<string>("🦆");
   const [modalPerfilAberto, setModalPerfilAberto] = useState<boolean>(false);
 
+  // ESTADO DO MENU MOBILE HÍBRIDO
+  const [menuAberto, setMenuAberto] = useState<boolean>(false);
+
   // ÁUDIO E WEBRTC QUEUE
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
   const [microfoneMutado, setMicrofoneMutado] = useState<boolean>(false);
@@ -37,7 +40,7 @@ export default function ChatPage() {
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
   const testStreamRef = useRef<MediaStream | null>(null);
-  const iceCandidatesQueue = useRef<RTCIceCandidateInit[]>([]); // Fila de pacotes de rede para o 4G
+  const iceCandidatesQueue = useRef<RTCIceCandidateInit[]>([]);
 
   // TIMER DA LAGOA
   const [tempoRestante, setTempoRestante] = useState<number | null>(null);
@@ -238,7 +241,6 @@ export default function ChatPage() {
         if (e.streams && e.streams[0]) {
           remoteAudioRef.current.srcObject = e.streams[0];
         } else {
-          // Fallback brutal para garantir a criação do stream
           const stream = new MediaStream();
           stream.addTrack(e.track);
           remoteAudioRef.current.srcObject = stream;
@@ -260,7 +262,6 @@ export default function ChatPage() {
   };
 
   const enviarOfertaWebRTC = async () => {
-    // PROTEÇÃO: Usa a referência viva para nunca pegar o estado antigo "lagoa"
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
     if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
 
@@ -348,7 +349,6 @@ export default function ChatPage() {
       pararRingtone(); 
       setChamadaAtiva(true); 
       setStatusConvite(null); 
-      // Executa enviando a referência atualizada!
       await enviarOfertaWebRTC(); 
     });
 
@@ -357,7 +357,6 @@ export default function ChatPage() {
         const pc = obterOuCriarPeerConnection();
         await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
         
-        // Esvazia a fila de ICE Candidates retidos
         iceCandidatesQueue.current.forEach(async (c) => {
           try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
         });
@@ -378,7 +377,6 @@ export default function ChatPage() {
       if (peerConnectionRef.current) { 
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); 
         
-        // Esvazia a fila de ICE Candidates retidos
         iceCandidatesQueue.current.forEach(async (c) => {
           try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
         });
@@ -393,7 +391,6 @@ export default function ChatPage() {
         if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
           try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) {} 
         } else {
-          // Fila de retenção vital para conexões lentas ou 4G
           iceCandidatesQueue.current.push(data.candidate);
         }
       }
@@ -554,11 +551,31 @@ export default function ChatPage() {
 
   return (
     <div className="app-layout">
-      {/* GARANTIA DE REPRODUÇÃO NO MOBILE: controls={false} e playsInline */}
+      {/* OVERLAY PARA O MENU MOBILE FECHAR AO CLICAR FORA */}
+      {menuAberto && <div className="menu-overlay open" onClick={() => setMenuAberto(false)}></div>}
+
       <audio ref={remoteAudioRef} autoPlay playsInline controls={false} style={{ display: 'none' }} />
       <audio ref={testAudioRef} autoPlay playsInline muted={false} style={{ display: 'none' }} />
 
       <style dangerouslySetInnerHTML={{__html: `
+        /* HÍBRIDO: MOBILE WHATSAPP/DISCORD & DESKTOP WIDE */
+        .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: #020d12; color: #fff; }
+        
+        .sidebar { width: 300px; background: #0b141a; border-right: 1px solid #1f2d35; display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100; flex-shrink: 0; }
+        .main-chat-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; }
+        
+        .hamburger-btn { display: none; background: transparent; border: none; color: #fff; font-size: 24px; cursor: pointer; padding: 0; margin-right: 12px; }
+        .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 90; backdrop-filter: blur(2px); }
+
+        @media (max-width: 768px) {
+          .sidebar { position: absolute; height: 100%; top: 0; left: 0; transform: translateX(-100%); }
+          .sidebar.open { transform: translateX(0); }
+          .hamburger-btn { display: block; }
+          .menu-overlay.open { display: block; }
+          .main-chat-area { width: 100%; }
+        }
+
+        /* COMPONENTES SECUNDÁRIOS DE UI */
         .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
         .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5); margin-top: -5px; }
         .discord-slider::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: transparent; }
@@ -583,7 +600,7 @@ export default function ChatPage() {
         .btn-test-mic.active { border-color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
       `}} />
 
-      <aside className="sidebar">
+      <aside className={`sidebar ${menuAberto ? 'open' : ''}`}>
         <div className="sidebar-header">
           <Link href="/" style={{ textDecoration: 'none', color: '#fff' }}>←</Link>
           <span>DuckZone Direct</span>
@@ -601,7 +618,7 @@ export default function ChatPage() {
         </div>
 
         <div className="chat-list">
-          <div className={`chat-item ${isLagoa ? "active" : ""}`} onClick={() => setAbaAtiva("lagoa")}>
+          <div className={`chat-item ${isLagoa ? "active" : ""}`} onClick={() => { setAbaAtiva("lagoa"); setMenuAberto(false); }}>
             <div className="chat-item-avatar">🌊</div>
             <div className="chat-item-info">
               <span className="chat-item-title">Lagoa Pública</span>
@@ -610,7 +627,7 @@ export default function ChatPage() {
           </div>
 
           {privados.map((chat, i) => (
-            <div key={chat.id} className={`chat-item ${abaAtiva === chat.id ? "active" : ""}`} onClick={() => setAbaAtiva(chat.id)}>
+            <div key={chat.id} className={`chat-item ${abaAtiva === chat.id ? "active" : ""}`} onClick={() => { setAbaAtiva(chat.id); setMenuAberto(false); }}>
               <div className="chat-item-avatar">🔒</div>
               <div className="chat-item-info">
                 <span className="chat-item-title">{chat.nomeCustom || `Ninho Privado ${i + 1}`}</span>
@@ -624,6 +641,9 @@ export default function ChatPage() {
       <main className="main-chat-area">
         <header className="chat-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* BOTÃO DE HAMBURGUER APARECE SÓ NO CELULAR */}
+            <button className="hamburger-btn" onClick={() => setMenuAberto(true)}>☰</button>
+            
             {editandoNome === abaAtiva && !isLagoa ? (
               <input 
                 value={nomePrivadoInput} 
@@ -650,13 +670,13 @@ export default function ChatPage() {
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             {!isLagoa && !chamadaAtiva && (
               <button onClick={solicitarChamadaVoz} className="btn-call-start">
-                📞 Iniciar Chamada
+                📞 <span className="hide-on-mobile">Ligar</span>
               </button>
             )}
 
             {isLagoa && lagoaAtiva && (
               <>
-                <button onClick={solicitarPrivado} className="back-btn" style={{ borderColor: "#2dd4bf", color: "#2dd4bf" }}>Puxar p/ Privado 🔐</button>
+                <button onClick={solicitarPrivado} className="back-btn" style={{ borderColor: "#2dd4bf", color: "#2dd4bf" }}>Puxar 🔐</button>
                 <button onClick={sairDaLagoa} className="back-btn" style={{ color: "#f43f5e", borderColor: "#f43f5e" }}>Sair 🚪</button>
               </>
             )}
@@ -687,18 +707,18 @@ export default function ChatPage() {
                 <div className="d-call-dot"></div>
                 <div className="d-call-text">
                   <span className="d-call-title">Voz Conectada</span>
-                  <span className="d-call-subtitle">Ninho Privado • Conexão Segura</span>
+                  <span className="d-call-subtitle">Ninho Privado</span>
                 </div>
               </div>
               <div className="d-call-actions">
-                <button onClick={() => setModalPerfilAberto(true)} className="d-action-btn">⚙️</button>
+                <button onClick={() => setModalPerfilAberto(true)} className="d-action-btn hide-on-mobile">⚙️</button>
                 <button onClick={alternarMuteMicrofone} className={`d-action-btn ${microfoneMutado ? "btn-muted" : ""}`}>
                   {microfoneMutado ? "🔇" : "🎙️"}
                 </button>
                 <button onClick={alternarAudioMutado} className={`d-action-btn ${audioMutado ? "btn-muted" : ""}`}>
                   {audioMutado ? "🔕" : "🎧"}
                 </button>
-                <button onClick={desligarChamada} className="d-action-btn btn-disconnect"><span>☎️</span> Desconectar</button>
+                <button onClick={desligarChamada} className="d-action-btn btn-disconnect"><span>☎️</span></button>
               </div>
             </div>
           )}
@@ -760,7 +780,7 @@ export default function ChatPage() {
               {isLagoa && convitePendente && (
                 <div style={{ background: "rgba(16,185,129,0.15)", border: "1px solid #10b981", padding: "16px", textAlign: "center", borderRadius: "16px", marginBottom: "12px" }}>
                   <p style={{ color: "#fff", fontWeight: "bold", marginBottom: "12px" }}>🔒 {convitePendente} te convidou para o Privado!</p>
-                  <button onClick={() => responderConvite(true)} className="send-btn" style={{ marginRight: "10px" }}>Aceitar (Revelar Perfil)</button>
+                  <button onClick={() => responderConvite(true)} className="send-btn" style={{ marginRight: "10px" }}>Aceitar</button>
                   <button onClick={() => responderConvite(false)} className="back-btn" style={{ color: "#f43f5e" }}>Recusar</button>
                 </div>
               )}
