@@ -28,10 +28,9 @@ export default function ChatPage() {
   const [meuAvatar, setMeuAvatar] = useState<string>("🦆");
   const [modalPerfilAberto, setModalPerfilAberto] = useState<boolean>(false);
 
-  // ESTADO DO MENU MOBILE HÍBRIDO
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
 
-  // ÁUDIO E WEBRTC QUEUE
+  // ÁUDIO
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
   const [microfoneMutado, setMicrofoneMutado] = useState<boolean>(false);
   const [audioMutado, setAudioMutado] = useState<boolean>(false);
@@ -112,7 +111,6 @@ export default function ChatPage() {
   const [editandoNome, setEditandoNome] = useState<string | null>(null);
   const [nomePrivadoInput, setNomePrivadoInput] = useState<string>("");
 
-  // ====== LÓGICA DO TIMER VISUAL DA LAGOA ======
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (lagoaAtiva) {
@@ -129,14 +127,9 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [lagoaAtiva]);
 
-  // ====== MOTOR DE ÁUDIO NATIVO ======
   const capturarAudioNativo = async (): Promise<MediaStream> => {
     return await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
   };
 
@@ -151,9 +144,7 @@ export default function ChatPage() {
         testStreamRef.current = stream;
         if (testAudioRef.current) testAudioRef.current.srcObject = stream;
         setTestandoMic(true);
-      } catch (err) {
-        alert("Permissão de microfone negada.");
-      }
+      } catch (err) { alert("Permissão de microfone negada."); }
     }
   };
 
@@ -162,7 +153,6 @@ export default function ChatPage() {
     setModalPerfilAberto(false);
   };
 
-  // ====== RINGTONES ======
   const tocarRingtone = (tipo: 'chamando' | 'recebendo') => {
     pararRingtone();
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -200,7 +190,7 @@ export default function ChatPage() {
     }
   }, [privados]);
 
-  // ====== WEBRTC CORE (IMUNE A STALE STATE E COM FILA) ======
+  // ====== SOCKET E WEBRTC ======
   const obterOuCriarPeerConnection = () => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
@@ -208,31 +198,16 @@ export default function ChatPage() {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
-        {
-          urls: "turn:global.relay.metered.ca:80",
-          username: "df6234af237090e8e4cf0f65",
-          credential: "BVHUUzvhydFv9T9m",
-        },
-        {
-          urls: "turn:global.relay.metered.ca:443",
-          username: "df6234af237090e8e4cf0f65",
-          credential: "BVHUUzvhydFv9T9m",
-        },
-        {
-          urls: "turn:global.relay.metered.ca:443?transport=tcp",
-          username: "df6234af237090e8e4cf0f65",
-          credential: "BVHUUzvhydFv9T9m",
-        },
+        { urls: "turn:global.relay.metered.ca:80", username: "df6234af237090e8e4cf0f65", credential: "BVHUUzvhydFv9T9m" },
+        { urls: "turn:global.relay.metered.ca:443", username: "df6234af237090e8e4cf0f65", credential: "BVHUUzvhydFv9T9m" },
+        { urls: "turn:global.relay.metered.ca:443?transport=tcp", username: "df6234af237090e8e4cf0f65", credential: "BVHUUzvhydFv9T9m" }
       ]
     });
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
-        socketRef.current?.emit("webrtc_ice_candidate", {
-          salaId: salaAlvo,
-          candidate: e.candidate,
-        });
+        socketRef.current?.emit("webrtc_ice_candidate", { salaId: salaAlvo, candidate: e.candidate });
       }
     };
 
@@ -245,14 +220,9 @@ export default function ChatPage() {
           stream.addTrack(e.track);
           remoteAudioRef.current.srcObject = stream;
         }
-        
         const playPromise = remoteAudioRef.current.play();
         if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            window.addEventListener('click', () => {
-              remoteAudioRef.current?.play();
-            }, { once: true });
-          });
+          playPromise.catch(() => { window.addEventListener('click', () => { remoteAudioRef.current?.play(); }, { once: true }); });
         }
       }
     };
@@ -264,124 +234,78 @@ export default function ChatPage() {
   const enviarOfertaWebRTC = async () => {
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
     if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
-
     try {
       const stream = await capturarAudioNativo();
       localStreamRef.current = stream;
-      
       const pc = obterOuCriarPeerConnection();
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      
       socketRef.current?.emit("webrtc_offer", { salaId: salaAlvo, offer });
-    } catch { alert("Microfone não encontrado ou permissão negada."); }
+    } catch { alert("Microfone negado."); }
   };
 
   const atenderChamadaVoz = async () => {
     pararRingtone();
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
     if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
-
     try {
       const stream = await capturarAudioNativo();
       localStreamRef.current = stream;
-      
       const pc = obterOuCriarPeerConnection();
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
       socketRef.current?.emit("aceitar_chamada_voz", { salaId: salaAlvo });
-      setChamadaRecebida(false); 
-      setChamadaAtiva(true);
-    } catch { alert("Microfone não encontrado ou permissão negada."); }
+      setChamadaRecebida(false); setChamadaAtiva(true);
+    } catch { alert("Microfone negado."); }
   };
 
-  // ====== SOCKET LISTENERS ======
   useEffect(() => {
     const socket = io();
     socketRef.current = socket;
 
     privados.forEach((chat) => socket.emit("entrar_sala_privada", { novaSalaPrivada: chat.id }));
 
-    socket.on("aguardando_parceiro", () => {
-      setProcurando(true); setLagoaPendente(null); setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false);
-    });
-
-    socket.on("parceiro_encontrado", (data) => {
-      setProcurando(false); setLagoaId(data.salaId); setLagoaPendente(data.salaId);
-      setMeuNomeAnon(data.meuNome); setParceiroNomeAnon(data.parceiroNome);
-      setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false);
-    });
-
+    socket.on("aguardando_parceiro", () => { setProcurando(true); setLagoaPendente(null); setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false); });
+    socket.on("parceiro_encontrado", (data) => { setProcurando(false); setLagoaId(data.salaId); setLagoaPendente(data.salaId); setMeuNomeAnon(data.meuNome); setParceiroNomeAnon(data.parceiroNome); setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false); });
     socket.on("atualizar_confirmacao", (data) => setConfirmados(data.confirmados));
-
-    socket.on("conexao_confirmada", (data) => {
-      setLagoaId(data.salaId); setLagoaAtiva(true); setLagoaPendente(null);
-      setLagoaMensagens([]); setConfirmados(2);
-    });
-
-    socket.on("tempo_esgotado", () => {
-      alert("O tempo limite (6 min) foi atingido. A lagoa fechou!");
-      sairDaLagoa();
-    });
+    socket.on("conexao_confirmada", (data) => { setLagoaId(data.salaId); setLagoaAtiva(true); setLagoaPendente(null); setLagoaMensagens([]); setConfirmados(2); });
+    socket.on("tempo_esgotado", () => { alert("A lagoa fechou (6 min)!"); sairDaLagoa(); });
 
     socket.on("receber_mensagem", (data: Mensagem & { salaId: string }) => {
       const novaMsg = { id: data.id, usuario: data.usuario, mensagem: data.mensagem, imagem: data.imagem, audio: data.audio, hora: data.hora };
       if (data.salaId.startsWith("ninho_")) {
         setPrivados((prev) => prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg] } : chat));
-      } else {
-        setLagoaMensagens((prev) => [...prev, novaMsg]);
-      }
+      } else { setLagoaMensagens((prev) => [...prev, novaMsg]); }
     });
 
     socket.on("mensagem_apagada", (data) => {
       if (data.salaId.startsWith("ninho_")) {
         setPrivados((prev) => prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: chat.mensagens.filter(m => m.id !== data.msgId) } : chat));
-      } else {
-        setLagoaMensagens((prev) => prev.filter(m => m.id !== data.msgId));
-      }
+      } else { setLagoaMensagens((prev) => prev.filter(m => m.id !== data.msgId)); }
     });
 
     socket.on("recebeu_chamada_voz", () => { setChamadaRecebida(true); tocarRingtone('recebendo'); });
-    
-    socket.on("chamada_voz_aceita_pelo_parceiro", async () => { 
-      pararRingtone(); 
-      setChamadaAtiva(true); 
-      setStatusConvite(null); 
-      await enviarOfertaWebRTC(); 
-    });
+    socket.on("chamada_voz_aceita_pelo_parceiro", async () => { pararRingtone(); setChamadaAtiva(true); setStatusConvite(null); await enviarOfertaWebRTC(); });
 
     socket.on("webrtc_offer", async (data) => {
       try {
         const pc = obterOuCriarPeerConnection();
         await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-        
-        iceCandidatesQueue.current.forEach(async (c) => {
-          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
-        });
+        iceCandidatesQueue.current.forEach(async (c) => { try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} });
         iceCandidatesQueue.current = [];
-
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        
         const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
         socketRef.current?.emit("webrtc_answer", { salaId: salaAlvo, answer });
         setChamadaAtiva(true);
-      } catch (err) {
-        console.error("Erro ao processar oferta:", err);
-      }
+      } catch (err) { console.error("Erro oferta:", err); }
     });
 
     socket.on("webrtc_answer", async (data) => {
       if (peerConnectionRef.current) { 
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); 
-        
-        iceCandidatesQueue.current.forEach(async (c) => {
-          try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
-        });
+        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} });
         iceCandidatesQueue.current = [];
-        
         setChamadaAtiva(true); 
       }
     });
@@ -390,15 +314,12 @@ export default function ChatPage() {
       if (data.candidate) { 
         if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
           try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) {} 
-        } else {
-          iceCandidatesQueue.current.push(data.candidate);
-        }
+        } else { iceCandidatesQueue.current.push(data.candidate); }
       }
     });
 
     socket.on("chamada_voz_recusada", () => { pararRingtone(); alert("O outro pato recusou a chamada."); encerrarChamadaLocal(); });
     socket.on("chamada_voz_encerrada", () => { pararRingtone(); encerrarChamadaLocal(); });
-
     socket.on("recebeu_convite_privado", (data) => { setConvitePendente(data.solicitante); setStatusConvite(null); });
 
     socket.on("migrar_para_privado", (data) => {
@@ -411,23 +332,19 @@ export default function ChatPage() {
       setAbaAtiva(novaId); setLagoaAtiva(false); setConvitePendente(null); setStatusConvite(null);
     });
 
-    socket.on("convite_privado_recusado", () => { setStatusConvite("O outro pato recusou o convite."); setTimeout(() => setStatusConvite(null), 3000); });
-
-    socket.on("parceiro_desconectou", () => {
-      pararRingtone(); setLagoaAtiva(false); setLagoaId(null); setLagoaPendente(null); setProcurando(false); setJaAceitou(false); setConfirmados(0); encerrarChamadaLocal();
-    });
+    socket.on("convite_privado_recusado", () => { setStatusConvite("O pato recusou o convite."); setTimeout(() => setStatusConvite(null), 3000); });
+    socket.on("parceiro_desconectou", () => { pararRingtone(); setLagoaAtiva(false); setLagoaId(null); setLagoaPendente(null); setProcurando(false); setJaAceitou(false); setConfirmados(0); encerrarChamadaLocal(); });
 
     return () => { pararRingtone(); if(testandoMic) alternarTesteMic(); socket.disconnect(); };
   }, []);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [lagoaMensagens, privados, abaAtiva]);
 
-  // ====== FUNÇÕES DA UI ======
   const solicitarChamadaVoz = () => {
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
     if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
     socketRef.current?.emit("iniciar_chamada_voz", { salaId: salaAlvo });
-    setStatusConvite("Chamando Pato... 📞");
+    setStatusConvite("Chamando... 📞");
     tocarRingtone('chamando');
   };
 
@@ -441,9 +358,7 @@ export default function ChatPage() {
   const alternarMuteMicrofone = () => {
     setMicrofoneMutado((prev) => {
       const novo = !prev;
-      if (localStreamRef.current) {
-        localStreamRef.current.getAudioTracks().forEach(track => track.enabled = !novo);
-      }
+      if (localStreamRef.current) localStreamRef.current.getAudioTracks().forEach(track => track.enabled = !novo);
       if (!novo && audioMutado) setAudioMutado(false);
       return novo;
     });
@@ -481,10 +396,7 @@ export default function ChatPage() {
   const sairDaLagoa = () => {
     socketRef.current?.emit("sair_da_lagoa");
     encerrarChamadaLocal();
-    setLagoaAtiva(false);
-    setLagoaId(null);
-    setConfirmados(0);
-    setTempoRestante(null);
+    setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -528,7 +440,7 @@ export default function ChatPage() {
         };
         recorder.start();
         setGravandoAudioMsg(true);
-      } catch { alert("Permissão de microfone negada."); }
+      } catch { alert("Microfone negado."); }
     }
   };
 
@@ -558,28 +470,60 @@ export default function ChatPage() {
       <audio ref={testAudioRef} autoPlay playsInline muted={false} style={{ display: 'none' }} />
 
       <style dangerouslySetInnerHTML={{__html: `
-        /* HÍBRIDO: MOBILE WHATSAPP/DISCORD & DESKTOP WIDE */
-        .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: #020d12; color: #fff; }
+        /* RESET E ESTRUTURA GLOBAL */
+        .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: #020d12; color: #fff; font-family: sans-serif; }
         
-        .sidebar { width: 300px; background: #0b141a; border-right: 1px solid #1f2d35; display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100; flex-shrink: 0; }
-        .main-chat-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; }
+        /* SIDEBAR - GAVETA PREMIUM */
+        .sidebar { 
+          width: 340px; 
+          background: #0b141a; 
+          border-right: 1px solid #1f2d35; 
+          display: flex; 
+          flex-direction: column; 
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+          z-index: 100; 
+          flex-shrink: 0; 
+        }
         
-        .hamburger-btn { display: none; background: transparent; border: none; color: #fff; font-size: 24px; cursor: pointer; padding: 0; margin-right: 12px; }
-        .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 90; backdrop-filter: blur(2px); }
+        .main-chat-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; background: #020d12; }
+        
+        .hamburger-btn { display: none; background: transparent; border: none; color: #fff; font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
+        .hamburger-btn:active { transform: scale(0.9); }
+        .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 90; backdrop-filter: blur(3px); }
 
         @media (max-width: 768px) {
-          .sidebar { position: absolute; height: 100%; top: 0; left: 0; transform: translateX(-100%); }
+          .sidebar { position: absolute; height: 100%; top: 0; left: 0; transform: translateX(-100%); max-width: 85vw; box-shadow: 5px 0 25px rgba(0,0,0,0.5); }
           .sidebar.open { transform: translateX(0); }
           .hamburger-btn { display: block; }
           .menu-overlay.open { display: block; }
           .main-chat-area { width: 100%; }
         }
 
-        /* COMPONENTES SECUNDÁRIOS DE UI */
+        /* PERFIL NA SIDEBAR */
+        .sidebar-profile { padding: 16px 20px; background: #0f1c24; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1f2d35; }
+        .sidebar-profile-info { display: flex; align-items: center; gap: 12px; overflow: hidden; }
+        .sidebar-avatar { width: 44px; height: 44px; background: #1a2830; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+        .sidebar-texts { display: flex; flex-direction: column; overflow: hidden; }
+        .sidebar-name { font-size: 15px; font-weight: bold; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-bio { font-size: 12px; color: #2dd4bf; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+
+        /* LISTA DE CHATS (ESTILO WHATSAPP/DISCORD) */
+        .chat-list { display: flex; flex-direction: column; overflow-y: auto; flex: 1; padding: 8px 0; }
+        .chat-item { display: flex; align-items: center; padding: 12px 20px; gap: 16px; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid rgba(255,255,255,0.02); }
+        .chat-item:hover { background: #121e24; }
+        .chat-item.active { background: rgba(45, 212, 191, 0.08); position: relative; }
+        .chat-item.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #2dd4bf; border-radius: 0 4px 4px 0; }
+        
+        .chat-item-avatar { width: 50px; height: 50px; border-radius: 50%; background: #1a2830; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .chat-item-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .chat-item-title { font-weight: 700; font-size: 16px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-item-sub { font-size: 13px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+
+        /* BOTÕES SECUNDÁRIOS E SLIDERS */
         .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
         .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5); margin-top: -5px; }
         .discord-slider::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: transparent; }
-        .discord-call-panel-v2 { background-color: #111214; border: 1px solid #1e1f22; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .discord-call-panel-v2 { background-color: #111214; border: 1px solid #1e1f22; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; margin: 10px 16px; }
         .d-call-info { display: flex; align-items: center; gap: 12px; }
         .d-call-dot { width: 12px; height: 12px; background-color: #23a559; border-radius: 50%; box-shadow: 0 0 8px rgba(35, 165, 89, 0.6); animation: pulse-green 2s infinite; }
         @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(35, 165, 89, 0); } 100% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0); } }
@@ -591,6 +535,7 @@ export default function ChatPage() {
         .d-action-btn:hover { background-color: #313338; border-color: #dbdee1; }
         .d-action-btn.btn-muted { background-color: #da373c; color: #fff; }
         .d-action-btn.btn-disconnect { background-color: #da373c; color: #fff; border-radius: 24px; width: auto; padding: 0 16px; font-size: 14px; font-weight: 700; gap: 8px; }
+        
         .pro-input { width: 100%; background: #121e24; border: 1px solid #1f2d35; color: #fff; padding: 14px 16px; border-radius: 12px; font-size: 14px; outline: none; }
         .pro-input:focus { border-color: #2dd4bf; box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.1); }
         .pro-label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
@@ -598,23 +543,28 @@ export default function ChatPage() {
         .avatar-btn.active { background: rgba(45, 212, 191, 0.15); border-color: #2dd4bf; }
         .btn-test-mic { width: 100%; padding: 16px; border-radius: 12px; cursor: pointer; font-weight: 800; font-size: 14px; border: 1px solid #1f2d35; background: #121e24; color: #f43f5e; display: flex; justify-content: center; gap: 8px;}
         .btn-test-mic.active { border-color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
+        
+        @media (max-width: 500px) {
+          .hide-on-mobile { display: none !important; }
+          .d-call-info { max-width: 50%; }
+          .d-call-subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        }
       `}} />
 
       <aside className={`sidebar ${menuAberto ? 'open' : ''}`}>
-        <div className="sidebar-header">
-          <Link href="/" style={{ textDecoration: 'none', color: '#fff' }}>←</Link>
-          <span>DuckZone Direct</span>
+        <div className="sidebar-header" style={{ padding: '16px 20px', borderBottom: '1px solid #1f2d35', background: '#0b141a', display: 'flex', alignItems: 'center' }}>
+          <Link href="/" style={{ textDecoration: 'none', color: '#fff', fontSize: '20px', fontWeight: 'bold' }}>← Voltar</Link>
         </div>
 
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border-color)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden" }}>
-            <span style={{ fontSize: "24px" }}>{meuAvatar}</span>
-            <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#fff" }}>{meuNomeReal}</span>
-              <span style={{ fontSize: "10px", color: "var(--teal-neon)", opacity: 0.8 }}>{meuStatusBio}</span>
+        <div className="sidebar-profile">
+          <div className="sidebar-profile-info">
+            <div className="sidebar-avatar">{meuAvatar}</div>
+            <div className="sidebar-texts">
+              <span className="sidebar-name">{meuNomeReal}</span>
+              <span className="sidebar-bio">{meuStatusBio}</span>
             </div>
           </div>
-          <button onClick={() => setModalPerfilAberto(true)} className="back-btn" style={{ fontSize: "10px", padding: "4px 8px" }}>Editar ⚙️</button>
+          <button onClick={() => setModalPerfilAberto(true)} style={{ background: '#121e24', border: '1px solid #1f2d35', color: '#fff', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>⚙️ Editar</button>
         </div>
 
         <div className="chat-list">
@@ -631,7 +581,7 @@ export default function ChatPage() {
               <div className="chat-item-avatar">🔒</div>
               <div className="chat-item-info">
                 <span className="chat-item-title">{chat.nomeCustom || `Ninho Privado ${i + 1}`}</span>
-                <span className="chat-item-sub">Bate-Papo Exclusivo</span>
+                <span className="chat-item-sub">Bate-Papo Seguro</span>
               </div>
             </div>
           ))}
@@ -639,9 +589,8 @@ export default function ChatPage() {
       </aside>
 
       <main className="main-chat-area">
-        <header className="chat-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* BOTÃO DE HAMBURGUER APARECE SÓ NO CELULAR */}
+        <header className="chat-header" style={{ display: 'flex', padding: '16px 20px', background: '#0b141a', borderBottom: '1px solid #1f2d35', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
             <button className="hamburger-btn" onClick={() => setMenuAberto(true)}>☰</button>
             
             {editandoNome === abaAtiva && !isLagoa ? (
@@ -654,50 +603,48 @@ export default function ChatPage() {
                 }}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
                 autoFocus
-                style={{ background: '#121e24', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '4px', padding: '4px 8px', outline: 'none' }}
+                style={{ background: '#121e24', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '4px', padding: '6px 10px', outline: 'none', fontSize: '16px', fontWeight: 'bold' }}
               />
             ) : (
               <span 
                 onClick={() => { if(!isLagoa) { setEditandoNome(abaAtiva); setNomePrivadoInput(privados.find(p => p.id === abaAtiva)?.nomeCustom || `Ninho Privado`); } }} 
-                style={{ cursor: isLagoa ? 'default' : 'pointer', fontSize: "16px", fontWeight: "bold", color: "#fff", display: 'flex', alignItems: 'center' }}
+                style={{ cursor: isLagoa ? 'default' : 'pointer', fontSize: "18px", fontWeight: "900", color: "#fff", display: 'flex', alignItems: 'center', letterSpacing: '0.5px' }}
               >
                 {isLagoa ? "Mergulho Anônimo" : (privados.find(p => p.id === abaAtiva)?.nomeCustom || "Ninho Privado")}
-                {!isLagoa && <span style={{fontSize: '12px', marginLeft: '6px', opacity: 0.5}}>✏️</span>}
+                {!isLagoa && <span style={{fontSize: '14px', marginLeft: '8px', opacity: 0.5}}>✏️</span>}
               </span>
             )}
           </div>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             {!isLagoa && !chamadaAtiva && (
-              <button onClick={solicitarChamadaVoz} className="btn-call-start">
+              <button onClick={solicitarChamadaVoz} className="btn-call-start" style={{ padding: '8px 16px', background: 'rgba(35, 165, 89, 0.15)', color: '#23a559', border: '1px solid #23a559', borderRadius: '8px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                 📞 <span className="hide-on-mobile">Ligar</span>
               </button>
             )}
 
             {isLagoa && lagoaAtiva && (
               <>
-                <button onClick={solicitarPrivado} className="back-btn" style={{ borderColor: "#2dd4bf", color: "#2dd4bf" }}>Puxar 🔐</button>
-                <button onClick={sairDaLagoa} className="back-btn" style={{ color: "#f43f5e", borderColor: "#f43f5e" }}>Sair 🚪</button>
+                <button onClick={solicitarPrivado} style={{ padding: '8px 12px', background: 'rgba(45, 212, 191, 0.1)', color: '#2dd4bf', border: '1px solid #2dd4bf', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  <span className="hide-on-mobile">Puxar </span>🔐
+                </button>
+                <button onClick={sairDaLagoa} style={{ padding: '8px 12px', background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e', border: '1px solid #f43f5e', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  <span className="hide-on-mobile">Sair </span>🚪
+                </button>
               </>
             )}
           </div>
         </header>
 
-        <div className="chat-body">
+        <div className="chat-body" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           {isLagoa && lagoaAtiva && tempoRestante !== null && (
             <div style={{
               backgroundColor: tempoRestante <= 60 ? 'rgba(244, 63, 94, 0.2)' : 'rgba(45, 212, 191, 0.1)',
               border: `1px solid ${tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf'}`,
               color: tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf',
-              padding: '10px',
-              textAlign: 'center',
-              fontSize: '13px',
-              fontWeight: 'bold',
-              margin: '10px 16px',
-              borderRadius: '8px',
-              transition: 'all 0.3s'
+              padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold', margin: '12px 16px', borderRadius: '10px', transition: 'all 0.3s'
             }}>
-              {tempoRestante <= 60 ? "⚠️ ATENÇÃO: " : "⏳ "} A Lagoa fechará em {Math.floor(tempoRestante / 60)}:{(tempoRestante % 60).toString().padStart(2, '0')}. Se quiserem continuar, puxe para o Privado!
+              {tempoRestante <= 60 ? "⚠️ " : "⏳ "} A Lagoa fechará em {Math.floor(tempoRestante / 60)}:{(tempoRestante % 60).toString().padStart(2, '0')}. Puxe para o Privado!
             </div>
           )}
 
@@ -740,67 +687,76 @@ export default function ChatPage() {
           )}
 
           {isLagoa && !lagoaAtiva && !lagoaPendente && !procurando && (
-            <div className="matching-card">
-              <div className="duck-avatar">🎭</div>
-              <h2 style={{ fontSize: "24px", fontWeight: "900", color: "#fff", marginBottom: "8px" }}>Lagoa Secreta</h2>
-              <p style={{ color: "var(--text-muted)", fontSize: "14px", marginBottom: "24px" }}>A conversa é 100% anônima e limitada a 6 minutos.</p>
-              <button onClick={procurarPato} className="btn-lagoa">ENTRAR NA ÁGUA 🚀</button>
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px' }}>
+              <div className="duck-avatar" style={{ fontSize: '80px', marginBottom: '20px' }}>🎭</div>
+              <h2 style={{ fontSize: "28px", fontWeight: "900", color: "#fff", marginBottom: "12px" }}>Lagoa Secreta</h2>
+              <p style={{ color: "#94a3b8", fontSize: "15px", marginBottom: "32px", lineHeight: '1.5' }}>Mergulhe anonimamente. Você tem 6 minutos para conhecer alguém antes que a lagoa feche.</p>
+              <button onClick={procurarPato} style={{ padding: '16px 32px', fontSize: '16px', fontWeight: '900', background: '#2dd4bf', color: '#000', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(45,212,191,0.3)' }}>ENTRAR NA ÁGUA 🚀</button>
             </div>
           )}
 
           {isLagoa && procurando && (
-            <div className="matching-card">
-              <div className="radar-spinner"></div>
-              <h2 style={{ color: "#2dd4bf" }}>Procurando um Pato...</h2>
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px' }}>
+              <div className="radar-spinner" style={{ margin: '0 auto 24px' }}></div>
+              <h2 style={{ color: "#2dd4bf", fontSize: '20px' }}>Procurando um Pato...</h2>
             </div>
           )}
 
           {isLagoa && lagoaPendente && !lagoaAtiva && (
-            <div className="matching-card" style={{ borderColor: "#2dd4bf" }}>
-              <h2 style={{ color: "#fff", marginBottom: "8px" }}>Pato Encontrado!</h2>
-              <div style={{ display: "inline-block", background: "rgba(20,184,166,0.2)", color: "#2dd4bf", padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "bold", marginBottom: "16px" }}>
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px', background: '#0b141a', border: '1px solid #2dd4bf', borderRadius: '20px' }}>
+              <h2 style={{ color: "#fff", marginBottom: "12px", fontSize: '22px' }}>Pato Encontrado!</h2>
+              <div style={{ display: "inline-block", background: "rgba(20,184,166,0.2)", color: "#2dd4bf", padding: "6px 16px", borderRadius: "20px", fontSize: "13px", fontWeight: "bold", marginBottom: "20px" }}>
                 Confirmações: {confirmados}/2
               </div>
-              <p style={{ color: "var(--text-muted)", marginBottom: "20px" }}>Deseja falar com <strong>{parceiroNomeAnon || "um Pato Anônimo"}</strong>?</p>
-              <button onClick={aceitarConexao} className="btn-lagoa" style={{ marginBottom: "10px", opacity: jaAceitou ? 0.6 : 1 }} disabled={jaAceitou}>
-                {jaAceitou ? "Aguardando outro Pato... ⏳" : "Sim, Conectar! 💚"}
-              </button>
-              <button onClick={recusarConexao} className="back-btn" style={{ width: "100%", padding: "16px", color: "#f43f5e" }}>Pular</button>
+              <p style={{ color: "#94a3b8", marginBottom: "24px" }}>Deseja falar com <strong>{parceiroNomeAnon || "um Pato Anônimo"}</strong>?</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '200px', margin: '0 auto' }}>
+                <button onClick={aceitarConexao} style={{ padding: '14px', background: jaAceitou ? '#10b981' : '#2dd4bf', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: jaAceitou ? 'default' : 'pointer' }} disabled={jaAceitou}>
+                  {jaAceitou ? "Aguardando... ⏳" : "Conectar! 💚"}
+                </button>
+                <button onClick={recusarConexao} style={{ padding: '14px', background: 'transparent', color: '#f43f5e', border: '1px solid #f43f5e', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Pular ❌</button>
+              </div>
             </div>
           )}
 
           {(isLagoa ? lagoaAtiva : true) && (
             <>
               {isLagoa && statusConvite && (
-                <div style={{ background: "rgba(6,24,33,0.9)", border: "1px solid #2dd4bf", color: "#fff", padding: "10px", textAlign: "center", borderRadius: "10px", marginBottom: "10px" }}>
+                <div style={{ background: "rgba(6,24,33,0.9)", border: "1px solid #2dd4bf", color: "#fff", padding: "10px", textAlign: "center", borderRadius: "10px", margin: "10px 16px" }}>
                   {statusConvite}
                 </div>
               )}
 
               {isLagoa && convitePendente && (
-                <div style={{ background: "rgba(16,185,129,0.15)", border: "1px solid #10b981", padding: "16px", textAlign: "center", borderRadius: "16px", marginBottom: "12px" }}>
+                <div style={{ background: "rgba(16,185,129,0.15)", border: "1px solid #10b981", padding: "16px", textAlign: "center", borderRadius: "16px", margin: "10px 16px" }}>
                   <p style={{ color: "#fff", fontWeight: "bold", marginBottom: "12px" }}>🔒 {convitePendente} te convidou para o Privado!</p>
-                  <button onClick={() => responderConvite(true)} className="send-btn" style={{ marginRight: "10px" }}>Aceitar</button>
-                  <button onClick={() => responderConvite(false)} className="back-btn" style={{ color: "#f43f5e" }}>Recusar</button>
+                  <button onClick={() => responderConvite(true)} style={{ padding: '10px 16px', background: '#10b981', border: 'none', color: '#000', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', marginRight: '10px' }}>Aceitar</button>
+                  <button onClick={() => responderConvite(false)} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid #f43f5e', color: '#f43f5e', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer' }}>Recusar</button>
                 </div>
               )}
 
-              <div className="chat-messages">
+              <div className="chat-messages" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {msgsAtuais.map((msg) => {
                   const meuNomeAqui = isLagoa ? meuNomeAnon : `${meuAvatar} ${meuNomeReal}`;
                   const eMinha = msg.usuario === meuNomeAqui;
                   const eSistema = msg.usuario.includes("SISTEMA");
 
                   return (
-                    <div key={msg.id} className={`msg-wrapper ${eSistema ? "system-msg" : eMinha ? "my-msg" : "other-msg"}`}>
-                      <div className="msg-header">
-                        <span className="msg-meta">{msg.usuario} • {msg.hora}</span>
-                        {eMinha && !eSistema && <button onClick={() => apagarMensagem(msg.id)} className="delete-btn">🗑️</button>}
+                    <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: eSistema ? 'center' : eMinha ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {msg.usuario} • {msg.hora}
+                        {eMinha && !eSistema && <span onClick={() => apagarMensagem(msg.id)} style={{ cursor: 'pointer' }}>🗑️</span>}
                       </div>
-                      <div className="msg-bubble">
+                      <div style={{ 
+                        background: eSistema ? '#1e293b' : eMinha ? '#2dd4bf' : '#1e293b', 
+                        color: eSistema ? '#cbd5e1' : eMinha ? '#020d12' : '#fff',
+                        padding: '10px 14px', borderRadius: eMinha ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
+                        maxWidth: '85%', fontSize: '15px', lineHeight: '1.4', wordBreak: 'break-word',
+                        border: eSistema ? '1px solid #334155' : 'none'
+                      }}>
                         {msg.mensagem}
-                        {msg.imagem && <img src={msg.imagem} alt="Mídia enviada" style={{ maxWidth: "100%", borderRadius: "10px", marginTop: "8px" }} />}
-                        {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%" }} />}
+                        {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "100%", borderRadius: "8px", marginTop: "8px" }} />}
+                        {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%", height: '36px' }} />}
                       </div>
                     </div>
                   );
@@ -808,24 +764,24 @@ export default function ChatPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <div className="chat-input-container">
+              <div style={{ padding: '16px', background: '#0b141a', borderTop: '1px solid #1f2d35' }}>
                 {imagemBase64 && (
-                  <div className="preview-container">
-                    <img src={imagemBase64} alt="Preview" className="preview-img" />
-                    <button onClick={() => setImagemBase64(null)} style={{ background: "none", border: "none", color: "#f43f5e", cursor: "pointer", marginLeft: "auto" }}>✕</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#121e24', padding: '8px', borderRadius: '8px', marginBottom: '10px' }}>
+                    <img src={imagemBase64} alt="Preview" style={{ height: '40px', borderRadius: '4px' }} />
+                    <button onClick={() => setImagemBase64(null)} style={{ background: "none", border: "none", color: "#f43f5e", cursor: "pointer", marginLeft: "auto", fontWeight: 'bold' }}>✕ Remover Foto</button>
                   </div>
                 )}
-                <form onSubmit={enviarMensagem} className="chat-input-area">
+                <form onSubmit={enviarMensagem} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   {!isLagoa && (
-                    <label className="attach-clip-btn">
+                    <label style={{ cursor: 'pointer', fontSize: '20px', padding: '8px', background: '#121e24', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
                     </label>
                   )}
-                  <input type="text" className="chat-input" placeholder={gravandoAudioMsg ? "Gravando áudio..." : "Escreva sua mensagem..."} value={texto} onChange={(e) => setTexto(e.target.value)} disabled={gravandoAudioMsg} autoFocus />
-                  <button type="button" onClick={alternarGravacaoAudioMsg} className={`mic-btn ${gravandoAudioMsg ? "recording" : ""}`}>
+                  <input type="text" placeholder={gravandoAudioMsg ? "Gravando áudio..." : "Digite uma mensagem..."} value={texto} onChange={(e) => setTexto(e.target.value)} disabled={gravandoAudioMsg} style={{ flex: 1, background: '#121e24', border: '1px solid #1f2d35', color: '#fff', padding: '14px 16px', borderRadius: '24px', outline: 'none', fontSize: '15px' }} />
+                  <button type="button" onClick={alternarGravacaoAudioMsg} style={{ background: gravandoAudioMsg ? 'rgba(244,63,94,0.2)' : '#121e24', border: gravandoAudioMsg ? '1px solid #f43f5e' : '1px solid #1f2d35', borderRadius: '50%', width: '46px', height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', transition: 'all 0.2s' }}>
                     {gravandoAudioMsg ? "🛑" : "🎙️"}
                   </button>
-                  <button type="submit" className="send-btn">Enviar</button>
+                  <button type="submit" style={{ background: '#2dd4bf', color: '#000', border: 'none', borderRadius: '50%', width: '46px', height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', fontWeight: 'bold' }}>➤</button>
                 </form>
               </div>
             </>
@@ -835,38 +791,47 @@ export default function ChatPage() {
 
       {/* MODAL DE PERFIL */}
       {modalPerfilAberto && (
-        <div onClick={fecharModalPerfil} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '480px', maxHeight: '90vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div onClick={fecharModalPerfil} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '400px', maxHeight: '90vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid #1f2d35' }}>
-              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>⚙️ Configurações</h3>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>⚙️ Perfil & Áudio</h3>
               <button onClick={fecharModalPerfil} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>✖</button>
             </div>
             
-            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <label className="pro-label">SEU NOME DE EXIBIÇÃO</label>
-                <input type="text" value={meuNomeReal} onChange={(e) => setMeuNomeReal(e.target.value)} className="pro-input" />
-                <label className="pro-label">STATUS/BIO</label>
-                <input type="text" value={meuStatusBio} onChange={(e) => setMeuStatusBio(e.target.value)} maxLength={50} className="pro-input" />
-                <label className="pro-label">SEU AVATAR</label>
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  {["🦆", "🦅", "🦉", "🐧", "👑", "🚀"].map((emoji) => (
-                    <span key={emoji} onClick={() => setMeuAvatar(emoji)} className={`avatar-btn ${meuAvatar === emoji ? 'active' : ''}`}>{emoji}</span>
-                  ))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label className="pro-label">NOME DE EXIBIÇÃO</label>
+                  <input type="text" value={meuNomeReal} onChange={(e) => setMeuNomeReal(e.target.value)} className="pro-input" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label className="pro-label">STATUS/BIO</label>
+                  <input type="text" value={meuStatusBio} onChange={(e) => setMeuStatusBio(e.target.value)} maxLength={50} className="pro-input" />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label className="pro-label">AVATAR</label>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {["🦆", "🦅", "🦉", "🐧", "👑", "🚀"].map((emoji) => (
+                      <span key={emoji} onClick={() => setMeuAvatar(emoji)} className={`avatar-btn ${meuAvatar === emoji ? 'active' : ''}`}>{emoji}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div style={{ borderTop: "1px solid #1f2d35" }}></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <label className="pro-label">VOLUME DA CHAMADA (SAÍDA)</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <label className="pro-label">VOLUME DE SAÍDA</label>
+                  <span style={{ fontSize: '12px', color: '#2dd4bf', fontWeight: 'bold' }}>{volumeSaida}%</span>
+                </div>
                 <input type="range" min="0" max="100" value={volumeSaida} onChange={(e) => setVolumeSaida(Number(e.target.value))} className="discord-slider" />
-                <button type="button" onClick={alternarTesteMic} className={`btn-test-mic ${testandoMic ? 'active' : ''}`}>
-                  {testandoMic ? '🛑 Parar Teste de Voz' : '🎙️ Testar meu Microfone'}
+                <button type="button" onClick={alternarTesteMic} className={`btn-test-mic ${testandoMic ? 'active' : ''}`} style={{ marginTop: '10px' }}>
+                  {testandoMic ? '🛑 Parar Teste' : '🎙️ Ouvir meu microfone'}
                 </button>
               </div>
             </div>
-            <div style={{ padding: '20px 24px', borderTop: '1px solid #1f2d35' }}>
-              <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: '#2dd4bf', border: 'none', borderRadius: '12px', color: '#000', fontWeight: '900', cursor: 'pointer' }}>
-                SALVAR E FECHAR 💾
+            <div style={{ padding: '20px 24px', borderTop: '1px solid #1f2d35', background: '#080e12' }}>
+              <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #2dd4bf, #10b981)', border: 'none', borderRadius: '12px', color: '#020d12', fontWeight: '900', cursor: 'pointer', fontSize: '15px' }}>
+                SALVAR ALTERAÇÕES 💾
               </button>
             </div>
           </div>
