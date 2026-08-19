@@ -125,7 +125,7 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [lagoaAtiva]);
 
-  // ====== MOTOR DE ÁUDIO NATIVO E GARANTIDO ======
+  // ====== MOTOR DE ÁUDIO NATIVO ======
   const capturarAudioNativo = async (): Promise<MediaStream> => {
     return await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -220,10 +220,9 @@ export default function ChatPage() {
       setLagoaMensagens([]); setConfirmados(2);
     });
 
-    // RECEBE EVENTO DE FECHAR A LAGOA DO SERVIDOR
     socket.on("tempo_esgotado", () => {
       alert("O tempo limite (6 min) foi atingido. A lagoa fechou!");
-      sairDaLagoa(true);
+      sairDaLagoa();
     });
 
     socket.on("receber_mensagem", (data: Mensagem & { salaId: string }) => {
@@ -291,18 +290,54 @@ export default function ChatPage() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [lagoaMensagens, privados, abaAtiva]);
 
-  // ====== WEBRTC E CHAMADAS ======
+  // ====== WEBRTC E CHAMADAS (COM SERVIDOR TURN) ======
   const obterOuCriarPeerConnection = () => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }] });
-    pc.onicecandidate = (e) => { if (e.candidate) socketRef.current?.emit("webrtc_ice_candidate", { salaId: abaAtiva !== "lagoa" ? abaAtiva : lagoaId, candidate: e.candidate }); };
-    pc.ontrack = (e) => { if (remoteAudioRef.current && e.streams[0]) remoteAudioRef.current.srcObject = e.streams[0]; };
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        {
+          urls: "turn:global.relay.metered.ca:80",
+          username: "df6234af237090e8e4cf0f65",
+          credential: "BVHUUzvhydFv9T9m",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443",
+          username: "df6234af237090e8e4cf0f65",
+          credential: "BVHUUzvhydFv9T9m",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443?transport=tcp",
+          username: "df6234af237090e8e4cf0f65",
+          credential: "BVHUUzvhydFv9T9m",
+        },
+      ]
+    });
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        socketRef.current?.emit("webrtc_ice_candidate", {
+          salaId: abaAtiva !== "lagoa" ? abaAtiva : lagoaId,
+          candidate: e.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (e) => {
+      if (remoteAudioRef.current && e.streams[0]) {
+        remoteAudioRef.current.srcObject = e.streams[0];
+        remoteAudioRef.current.play().catch((err) => console.log("Erro no play do áudio:", err));
+      }
+    };
+
     peerConnectionRef.current = pc;
     return pc;
   };
 
   const solicitarChamadaVoz = () => {
-    if (abaAtiva === "lagoa") return; // Garante que não chame na lagoa
+    if (abaAtiva === "lagoa") return;
     socketRef.current?.emit("iniciar_chamada_voz", { salaId: abaAtiva });
     setStatusConvite("Chamando Pato... 📞");
     tocarRingtone('chamando');
@@ -340,7 +375,7 @@ export default function ChatPage() {
     setMicrofoneMutado((prev) => {
       const novo = !prev;
       if (localStreamRef.current) {
-        localStreamRef.current.getAudioTracks().forEach(track => track.enabled = !novo); // Muta fisicamente a faixa de áudio
+        localStreamRef.current.getAudioTracks().forEach(track => track.enabled = !novo);
       }
       if (!novo && audioMutado) setAudioMutado(false);
       return novo;
@@ -350,7 +385,7 @@ export default function ChatPage() {
   const alternarAudioMutado = () => {
     setAudioMutado((prev) => {
       const novo = !prev;
-      if (novo && !microfoneMutado) alternarMuteMicrofone(); // Se ensurdece, muta o mic também
+      if (novo && !microfoneMutado) alternarMuteMicrofone();
       return novo;
     });
   };
@@ -371,7 +406,7 @@ export default function ChatPage() {
   const solicitarPrivado = () => { if (!lagoaId) return; setStatusConvite("Convite enviado! Aguardando..."); socketRef.current?.emit("solicitar_chat_privado", { salaId: lagoaId, meuNome: meuNomeAnon }); };
   const responderConvite = (aceito: boolean) => { if (!lagoaId) return; socketRef.current?.emit("responder_convite_privado", { salaId: lagoaId, aceito }); setConvitePendente(null); };
 
-  const sairDaLagoa = (forcado = false) => {
+  const sairDaLagoa = () => {
     socketRef.current?.emit("sair_da_lagoa");
     encerrarChamadaLocal();
     setLagoaAtiva(false);
@@ -537,7 +572,6 @@ export default function ChatPage() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {/* O BOTÃO DE CHAMADA SÓ APARECE EM NINHOS PRIVADOS */}
             {!isLagoa && !chamadaAtiva && (
               <button onClick={solicitarChamadaVoz} className="btn-call-start">
                 📞 Iniciar Chamada
@@ -547,15 +581,13 @@ export default function ChatPage() {
             {isLagoa && lagoaAtiva && (
               <>
                 <button onClick={solicitarPrivado} className="back-btn" style={{ borderColor: "#2dd4bf", color: "#2dd4bf" }}>Puxar p/ Privado 🔐</button>
-                <button onClick={() => sairDaLagoa(false)} className="back-btn" style={{ color: "#f43f5e", borderColor: "#f43f5e" }}>Sair 🚪</button>
+                <button onClick={sairDaLagoa} className="back-btn" style={{ color: "#f43f5e", borderColor: "#f43f5e" }}>Sair 🚪</button>
               </>
             )}
           </div>
         </header>
 
         <div className="chat-body">
-
-          {/* AVISO DO TIMER DA LAGOA NA TELA (SÓ APARECE QUANDO CONECTADO NA LAGOA) */}
           {isLagoa && lagoaAtiva && tempoRestante !== null && (
             <div style={{
               backgroundColor: tempoRestante <= 60 ? 'rgba(244, 63, 94, 0.2)' : 'rgba(45, 212, 191, 0.1)',
@@ -579,7 +611,7 @@ export default function ChatPage() {
                 <div className="d-call-dot"></div>
                 <div className="d-call-text">
                   <span className="d-call-title">Voz Conectada</span>
-                  <span className="d-call-subtitle">Ninho Privado • Filtro Nativo Ativo</span>
+                  <span className="d-call-subtitle">Ninho Privado • TURN Relay Ativo</span>
                 </div>
               </div>
               <div className="d-call-actions">
