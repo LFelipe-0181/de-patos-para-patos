@@ -1,11 +1,11 @@
 import GoogleProvider from "next-auth/providers/google";
-import { AuthOptions } from "next-auth";
 
-export const authOptions: AuthOptions = {
+export const authOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true, // <-- ADICIONE ESTA LINHA AQUI
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,

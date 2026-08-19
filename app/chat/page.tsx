@@ -24,13 +24,30 @@ export default function ChatPage() {
   const { data: session } = useSession();
   
   const [meuNomeReal, setMeuNomeReal] = useState<string>("");
+  const [minhaTag, setMinhaTag] = useState<string>("....");
   const [meuStatusBio, setMeuStatusBio] = useState<string>("Nadando nas águas profundas...");
   const [meuAvatar, setMeuAvatar] = useState<string>("🦆");
+  
+  const [meuGenero, setMeuGenero] = useState<string>("prefiro-nao-dizer");
+  const [preferenciasGenero, setPreferenciasGenero] = useState<string[]>(["qualquer"]);
+  
+  const [abaConfig, setAbaConfig] = useState<'perfil' | 'audio' | 'notificacoes'>('perfil');
+  const [permiteNotificacoes, setPermiteNotificacoes] = useState<boolean>(false);
+  const permiteNotificacoesRef = useRef<boolean>(false);
+  
   const [modalPerfilAberto, setModalPerfilAberto] = useState<boolean>(false);
+  
+  const [modalAmigosAberto, setModalAmigosAberto] = useState<boolean>(false);
+  const [amigoTagInput, setAmigoTagInput] = useState<string>("");
+  const [amigoMensagem, setAmigoMensagem] = useState<string>("");
+  
+  const [abaAmigos, setAbaAmigos] = useState<'add' | 'pending' | 'list'>('add');
+  const [listaPendentes, setListaPendentes] = useState<any[]>([]);
+  const [listaAmigosAceitos, setListaAmigosAceitos] = useState<any[]>([]);
+  const [meuIdBanco, setMeuIdBanco] = useState<string>("");
 
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
 
-  // ÁUDIO
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
   const [microfoneMutado, setMicrofoneMutado] = useState<boolean>(false);
   const [audioMutado, setAudioMutado] = useState<boolean>(false);
@@ -41,8 +58,47 @@ export default function ChatPage() {
   const testStreamRef = useRef<MediaStream | null>(null);
   const iceCandidatesQueue = useRef<RTCIceCandidateInit[]>([]);
 
-  // TIMER DA LAGOA
   const [tempoRestante, setTempoRestante] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const salva = localStorage.getItem('duckzone_notificacoes') === 'true';
+      if (salva && Notification.permission === "granted") {
+        setPermiteNotificacoes(true);
+        permiteNotificacoesRef.current = true;
+      }
+    }
+  }, []);
+
+  const handleToggleNotificacoes = async () => {
+    if (!permiteNotificacoes) {
+      if (!("Notification" in window)) {
+        alert("Este navegador não suporta notificações de área de trabalho.");
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        setPermiteNotificacoes(true);
+        permiteNotificacoesRef.current = true;
+        localStorage.setItem('duckzone_notificacoes', 'true');
+        new Notification("DuckZone", { body: "Notificações ativadas com sucesso! 🦆" });
+      } else {
+        alert("Você precisa permitir as notificações no navegador para ativar essa função.");
+      }
+    } else {
+      setPermiteNotificacoes(false);
+      permiteNotificacoesRef.current = false;
+      localStorage.setItem('duckzone_notificacoes', 'false');
+    }
+  };
+
+  const dispararNotificacao = (titulo: string, corpo: string) => {
+    if (permiteNotificacoesRef.current && "Notification" in window && Notification.permission === "granted") {
+      if (document.hidden) {
+        new Notification(titulo, { body: corpo, icon: "🦆" });
+      }
+    }
+  };
 
   useEffect(() => {
     if (remoteAudioRef.current) {
@@ -56,14 +112,107 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (session?.user) {
-      setMeuNomeReal(session.user.name || session.user.email?.split("@")[0] || "Pato Verificado");
+      const email = session.user.email || `${session.user.name?.toLowerCase().replace(/\s+/g, '')}@duckzone.local`;
+      const name = session.user.name || "Pato Verificado";
+
+      fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email }),
+      })
+        .then(async (res) => {
+          const data = await res.json();
+          if (res.ok && !data.error) {
+            setMeuNomeReal(data.name);
+            setMinhaTag(data.tag || "2629");
+            if (data.avatar) setMeuAvatar(data.avatar);
+            if (data.bio) setMeuStatusBio(data.bio);
+            if (data.gender) setMeuGenero(data.gender);
+          } else {
+            setMeuNomeReal(`ERRO: ${data.error || 'Desconhecido'}`);
+            setMinhaTag("0000");
+          }
+        })
+        .catch((err) => {
+          setMeuNomeReal(`FALHA: ${err.message}`);
+          setMinhaTag("0000");
+        });
     }
   }, [session]);
+
+  const buscarAmigos = async () => {
+    if (!session?.user?.email) return;
+    try {
+      const res = await fetch(`/api/friends?email=${session.user.email}`);
+      const data = await res.json();
+      if (res.ok) {
+        setListaPendentes(data.pendentes || []);
+        setListaAmigosAceitos(data.amigos || []);
+        setMeuIdBanco(data.myId);
+
+        const amigos = data.amigos || [];
+        if (amigos.length > 0) {
+          setPrivados((prev) => {
+            const novosPrivados = [...prev];
+            let mudou = false;
+
+            amigos.forEach((amizade: any) => {
+              const roomId = `ninho_friend_${amizade.id}`;
+              const amigo = amizade.senderId === data.myId ? amizade.receiver : amizade.sender;
+
+              if (!novosPrivados.some(p => p.id === roomId)) {
+                novosPrivados.push({
+                  id: roomId,
+                  nomeCustom: amigo.name,
+                  mensagens: []
+                });
+                mudou = true;
+              }
+              socketRef.current?.emit("entrar_sala_privada", { novaSalaPrivada: roomId });
+            });
+
+            return mudou ? novosPrivados : prev;
+          });
+        }
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => {
+    if (session?.user?.email) {
+      buscarAmigos();
+    }
+  }, [session, modalAmigosAberto, abaAmigos]);
+
+  const enviarConviteAmizade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAmigoMensagem("Enviando convite... ⏳");
+    try {
+      const res = await fetch('/api/friends', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senderEmail: session?.user?.email, targetTagString: amigoTagInput })
+      });
+      const data = await res.json();
+      if (res.ok) { setAmigoMensagem(`✅ ${data.message}`); setAmigoTagInput(""); } 
+      else { setAmigoMensagem(`❌ ${data.error}`); }
+    } catch (err) { setAmigoMensagem("❌ Erro ao conectar com o servidor."); }
+  };
+
+  const responderConviteAmizade = async (id: string, action: 'ACCEPT' | 'REJECT') => {
+    try {
+      await fetch('/api/friends', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ friendshipId: id, action })
+      });
+      buscarAmigos(); 
+    } catch (e) { console.error(e); }
+  };
 
   const socketRef = useRef<Socket | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-
   const ringtoneCtxRef = useRef<AudioContext | null>(null);
   const ringtoneIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -103,6 +252,13 @@ export default function ChatPage() {
     }
     return [];
   });
+
+  const iniciarChatComAmigo = (amizadeId: string) => {
+    const roomId = `ninho_friend_${amizadeId}`; 
+    setAbaAtiva(roomId);
+    setMenuAberto(false);
+    setModalAmigosAberto(false);
+  };
 
   const [texto, setTexto] = useState("");
   const [imagemBase64, setImagemBase64] = useState<string | null>(null);
@@ -148,8 +304,27 @@ export default function ChatPage() {
     }
   };
 
-  const fecharModalPerfil = () => {
+  const fecharModalPerfil = async () => {
     if (testandoMic) alternarTesteMic();
+    
+    if (session?.user?.email) {
+      try {
+        await fetch('/api/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: session.user.email,
+            name: meuNomeReal,
+            bio: meuStatusBio,
+            avatar: meuAvatar,
+            gender: meuGenero
+          })
+        });
+      } catch (error) {
+        console.error("Erro ao salvar perfil", error);
+      }
+    }
+
     setModalPerfilAberto(false);
   };
 
@@ -197,10 +372,7 @@ export default function ChatPage() {
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "turn:global.relay.metered.ca:80", username: "df6234af237090e8e4cf0f65", credential: "BVHUUzvhydFv9T9m" },
-        { urls: "turn:global.relay.metered.ca:443", username: "df6234af237090e8e4cf0f65", credential: "BVHUUzvhydFv9T9m" },
-        { urls: "turn:global.relay.metered.ca:443?transport=tcp", username: "df6234af237090e8e4cf0f65", credential: "BVHUUzvhydFv9T9m" }
+        { urls: "stun:stun1.l.google.com:19302" }
       ]
     });
 
@@ -273,9 +445,24 @@ export default function ChatPage() {
 
     socket.on("receber_mensagem", (data: Mensagem & { salaId: string }) => {
       const novaMsg = { id: data.id, usuario: data.usuario, mensagem: data.mensagem, imagem: data.imagem, audio: data.audio, hora: data.hora };
+      
       if (data.salaId.startsWith("ninho_")) {
-        setPrivados((prev) => prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg] } : chat));
-      } else { setLagoaMensagens((prev) => [...prev, novaMsg]); }
+        setPrivados((prev) => {
+          const existe = prev.some(c => c.id === data.salaId);
+          if (existe) {
+            return prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg] } : chat);
+          } else {
+            return [...prev, { id: data.salaId, nomeCustom: "Novo Amigo", mensagens: [novaMsg] }];
+          }
+        });
+      } else { 
+        setLagoaMensagens((prev) => [...prev, novaMsg]); 
+      }
+
+      const isSistema = data.usuario.includes("SISTEMA");
+      if (!isSistema) {
+        dispararNotificacao(`DuckZone: ${data.usuario}`, novaMsg.mensagem);
+      }
     });
 
     socket.on("mensagem_apagada", (data) => {
@@ -284,7 +471,11 @@ export default function ChatPage() {
       } else { setLagoaMensagens((prev) => prev.filter(m => m.id !== data.msgId)); }
     });
 
-    socket.on("recebeu_chamada_voz", () => { setChamadaRecebida(true); tocarRingtone('recebendo'); });
+    socket.on("recebeu_chamada_voz", () => { 
+      setChamadaRecebida(true); 
+      tocarRingtone('recebendo'); 
+      dispararNotificacao("DuckZone", "📞 Alguém está te ligando!"); 
+    });
     socket.on("chamada_voz_aceita_pelo_parceiro", async () => { pararRingtone(); setChamadaAtiva(true); setStatusConvite(null); await enviarOfertaWebRTC(); });
 
     socket.on("webrtc_offer", async (data) => {
@@ -304,7 +495,7 @@ export default function ChatPage() {
     socket.on("webrtc_answer", async (data) => {
       if (peerConnectionRef.current) { 
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); 
-        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} });
+        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e){} });
         iceCandidatesQueue.current = [];
         setChamadaAtiva(true); 
       }
@@ -320,7 +511,12 @@ export default function ChatPage() {
 
     socket.on("chamada_voz_recusada", () => { pararRingtone(); alert("O outro pato recusou a chamada."); encerrarChamadaLocal(); });
     socket.on("chamada_voz_encerrada", () => { pararRingtone(); encerrarChamadaLocal(); });
-    socket.on("recebeu_convite_privado", (data) => { setConvitePendente(data.solicitante); setStatusConvite(null); });
+    
+    socket.on("recebeu_convite_privado", (data) => { 
+      setConvitePendente(data.solicitante); 
+      setStatusConvite(null); 
+      dispararNotificacao("DuckZone", `🔒 ${data.solicitante} te convidou para um Ninho Privado!`);
+    });
 
     socket.on("migrar_para_privado", (data) => {
       const novaId = data.novaSalaPrivada;
@@ -339,6 +535,44 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [lagoaMensagens, privados, abaAtiva]);
+
+  const togglePreferencia = (valor: string) => {
+    setPreferenciasGenero((prev) => {
+      if (valor === 'qualquer') return ['qualquer'];
+      
+      const semQualquer = prev.filter(p => p !== 'qualquer');
+      if (semQualquer.includes(valor)) {
+        const nova = semQualquer.filter(p => p !== valor);
+        return nova.length === 0 ? ['qualquer'] : nova;
+      } else {
+        return [...semQualquer, valor];
+      }
+    });
+  };
+
+  const procurarPato = () => { 
+    setProcurando(true); 
+    socketRef.current?.emit("procurar_parceiro", {
+      meuGenero: meuGenero,
+      preferencia: preferenciasGenero
+    }); 
+  };
+
+  const cancelarBusca = () => {
+    setProcurando(false);
+    socketRef.current?.emit("cancelar_busca");
+  };
+  
+  const aceitarConexao = () => { if (lagoaPendente && !jaAceitou) { setJaAceitou(true); socketRef.current?.emit("confirmar_conexao", { salaId: lagoaPendente }); } };
+  const recusarConexao = () => { setLagoaPendente(null); setJaAceitou(false); setConfirmados(0); procurarPato(); };
+  const solicitarPrivado = () => { if (!lagoaId) return; setStatusConvite("Convite enviado! Aguardando..."); socketRef.current?.emit("solicitar_chat_privado", { salaId: lagoaId, meuNome: `${meuNomeReal}#${minhaTag}` }); };
+  const responderConvite = (aceito: boolean) => { if (!lagoaId) return; socketRef.current?.emit("responder_convite_privado", { salaId: lagoaId, aceito }); setConvitePendente(null); };
+
+  const sairDaLagoa = () => {
+    socketRef.current?.emit("sair_da_lagoa");
+    encerrarChamadaLocal();
+    setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null);
+  };
 
   const solicitarChamadaVoz = () => {
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
@@ -387,18 +621,6 @@ export default function ChatPage() {
     encerrarChamadaLocal(); 
   };
 
-  const procurarPato = () => { setProcurando(true); socketRef.current?.emit("procurar_parceiro"); };
-  const aceitarConexao = () => { if (lagoaPendente && !jaAceitou) { setJaAceitou(true); socketRef.current?.emit("confirmar_conexao", { salaId: lagoaPendente }); } };
-  const recusarConexao = () => { setLagoaPendente(null); setJaAceitou(false); setConfirmados(0); procurarPato(); };
-  const solicitarPrivado = () => { if (!lagoaId) return; setStatusConvite("Convite enviado! Aguardando..."); socketRef.current?.emit("solicitar_chat_privado", { salaId: lagoaId, meuNome: meuNomeAnon }); };
-  const responderConvite = (aceito: boolean) => { if (!lagoaId) return; socketRef.current?.emit("responder_convite_privado", { salaId: lagoaId, aceito }); setConvitePendente(null); };
-
-  const sairDaLagoa = () => {
-    socketRef.current?.emit("sair_da_lagoa");
-    encerrarChamadaLocal();
-    setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null);
-  };
-
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -433,7 +655,7 @@ export default function ChatPage() {
           const reader = new FileReader();
           reader.onloadend = () => {
             const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
-            if (salaAlvo) socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: abaAtiva !== "lagoa" ? `${meuAvatar} ${meuNomeReal}` : meuNomeAnon, mensagem: "🎤 Mensagem de áudio", audio: reader.result as string });
+            if (salaAlvo) socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: abaAtiva !== "lagoa" ? `${meuAvatar} ${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: "🎤 Mensagem de áudio", audio: reader.result as string });
           };
           reader.readAsDataURL(audioBlob);
           stream.getTracks().forEach((track) => track.stop());
@@ -449,7 +671,7 @@ export default function ChatPage() {
     if (!texto.trim() && !imagemBase64) return;
     const isPrivado = abaAtiva !== "lagoa"; const salaAlvo = isPrivado ? abaAtiva : lagoaId;
     if (!salaAlvo) return;
-    socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: isPrivado ? `${meuAvatar} ${meuNomeReal}` : meuNomeAnon, mensagem: texto, imagem: isPrivado ? imagemBase64 : null });
+    socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: isPrivado ? `${meuAvatar} ${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: texto, imagem: isPrivado ? imagemBase64 : null });
     setTexto(""); setImagemBase64(null);
   };
 
@@ -463,7 +685,6 @@ export default function ChatPage() {
 
   return (
     <div className="app-layout">
-      {/* OVERLAY PARA O MENU MOBILE FECHAR AO CLICAR FORA */}
       {menuAberto && <div className="menu-overlay open" onClick={() => setMenuAberto(false)}></div>}
 
       <audio ref={remoteAudioRef} autoPlay playsInline controls={false} style={{ display: 'none' }} />
@@ -472,25 +693,12 @@ export default function ChatPage() {
       <style dangerouslySetInnerHTML={{__html: `
         /* RESET E ESTRUTURA GLOBAL */
         .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: #020d12; color: #fff; font-family: sans-serif; }
-        
-        /* SIDEBAR - GAVETA PREMIUM */
-        .sidebar { 
-          width: 340px; 
-          background: #0b141a; 
-          border-right: 1px solid #1f2d35; 
-          display: flex; 
-          flex-direction: column; 
-          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-          z-index: 100; 
-          flex-shrink: 0; 
-        }
-        
+        .sidebar { width: 340px; background: #0b141a; border-right: 1px solid #1f2d35; display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100; flex-shrink: 0; }
         .main-chat-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; background: #020d12; }
-        
         .hamburger-btn { display: none; background: transparent; border: none; color: #fff; font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
         .hamburger-btn:active { transform: scale(0.9); }
         .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 90; backdrop-filter: blur(3px); }
-
+        
         @media (max-width: 768px) {
           .sidebar { position: absolute; height: 100%; top: 0; left: 0; transform: translateX(-100%); max-width: 85vw; box-shadow: 5px 0 25px rgba(0,0,0,0.5); }
           .sidebar.open { transform: translateX(0); }
@@ -499,27 +707,35 @@ export default function ChatPage() {
           .main-chat-area { width: 100%; }
         }
 
-        /* PERFIL NA SIDEBAR */
-        .sidebar-profile { padding: 16px 20px; background: #0f1c24; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1f2d35; }
-        .sidebar-profile-info { display: flex; align-items: center; gap: 12px; overflow: hidden; }
-        .sidebar-avatar { width: 44px; height: 44px; background: #1a2830; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
-        .sidebar-texts { display: flex; flex-direction: column; overflow: hidden; }
-        .sidebar-name { font-size: 15px; font-weight: bold; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .sidebar-bio { font-size: 12px; color: #2dd4bf; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+        /* PERFIL REDESENHADO (ESTILO CARD DISCORD/TELEGRAM) */
+        .sidebar-header { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); background: #0b141a; }
+        .back-link { text-decoration: none; color: #94a3b8; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s; }
+        .back-link:hover { color: #2dd4bf; }
 
-        /* LISTA DE CHATS (ESTILO WHATSAPP/DISCORD) */
-        .chat-list { display: flex; flex-direction: column; overflow-y: auto; flex: 1; padding: 8px 0; }
-        .chat-item { display: flex; align-items: center; padding: 12px 20px; gap: 16px; cursor: pointer; transition: background 0.2s; border-bottom: 1px solid rgba(255,255,255,0.02); }
-        .chat-item:hover { background: #121e24; }
-        .chat-item.active { background: rgba(45, 212, 191, 0.08); position: relative; }
-        .chat-item.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #2dd4bf; border-radius: 0 4px 4px 0; }
+        .profile-card-container { padding: 12px 16px; border-bottom: 1px solid #1f2d35; }
+        .profile-card { background: linear-gradient(135deg, #0f1c24, #12212b); border: 1px solid #1f2d35; border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .profile-card-avatar { width: 46px; height: 48px; background: #1a2830; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 1px solid rgba(45,212,191,0.2); flex-shrink: 0; }
+        .profile-card-details { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+        .profile-card-name { font-size: 14px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .profile-card-tag { font-size: 11px; color: #2dd4bf; font-family: monospace; font-weight: bold; }
+        .profile-card-bio { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+
+        .profile-actions-inline { display: flex; gap: 6px; }
+        .icon-action-btn { width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; cursor: pointer; transition: all 0.2s; }
+        .icon-action-btn:hover { background: #2dd4bf; color: #020d12; border-color: #2dd4bf; transform: translateY(-1px); }
+
+        /* LISTA DE CHATS */
+        .chat-list { display: flex; flex-direction: column; overflow-y: auto; flex: 1; padding: 12px 12px; gap: 6px; }
+        .chat-item { display: flex; align-items: center; padding: 10px 14px; gap: 14px; cursor: pointer; transition: all 0.2s; border-radius: 12px; border: 1px solid transparent; }
+        .chat-item:hover { background: #121e24; border-color: rgba(255,255,255,0.04); }
+        .chat-item.active { background: rgba(45, 212, 191, 0.1); border-color: rgba(45, 212, 191, 0.3); }
         
-        .chat-item-avatar { width: 50px; height: 50px; border-radius: 50%; background: #1a2830; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .chat-item-avatar { width: 42px; height: 42px; border-radius: 12px; background: #1a2830; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
         .chat-item-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-        .chat-item-title { font-weight: 700; font-size: 16px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .chat-item-sub { font-size: 13px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+        .chat-item-title { font-weight: 700; font-size: 14px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-item-sub { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 
-        /* BOTÕES SECUNDÁRIOS E SLIDERS */
+        /* PAINEL DE LIGAÇÃO DISCORD */
         .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
         .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5); margin-top: -5px; }
         .discord-slider::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: transparent; }
@@ -544,6 +760,24 @@ export default function ChatPage() {
         .btn-test-mic { width: 100%; padding: 16px; border-radius: 12px; cursor: pointer; font-weight: 800; font-size: 14px; border: 1px solid #1f2d35; background: #121e24; color: #f43f5e; display: flex; justify-content: center; gap: 8px;}
         .btn-test-mic.active { border-color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
         
+        .friend-card { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: #121e24; border-radius: 16px; border: 1px solid #1f2d35; margin-bottom: 12px; transition: all 0.2s ease; cursor: pointer; }
+        .friend-card:hover { background: #1a2830; border-color: #2dd4bf; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .friend-avatar-wrap { position: relative; width: 48px; height: 48px; background: #0b141a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
+        .friend-info { display: flex; flex-direction: column; }
+        .friend-name { font-weight: 800; font-size: 16px; color: #fff; display: flex; align-items: center; gap: 6px; }
+        .friend-tag { font-size: 13px; color: #94a3b8; font-family: monospace; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 6px; }
+        .chat-action-btn { width: 40px; height: 40px; border-radius: 50%; background: rgba(45, 212, 191, 0.1); border: 1px solid rgba(45, 212, 191, 0.2); display: flex; align-items: center; justify-content: center; font-size: 18px; color: #2dd4bf; transition: all 0.2s; }
+        .friend-card:hover .chat-action-btn { background: #2dd4bf; color: #000; transform: scale(1.1); }
+        .btn-accept { background: #10b981; color: #020d12; border: none; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 900; transition: 0.2s; }
+        .btn-accept:hover { background: #059669; transform: scale(1.05); }
+        .btn-reject { background: transparent; color: #f43f5e; border: 1px solid #f43f5e; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 900; transition: 0.2s; }
+        .btn-reject:hover { background: rgba(244, 63, 94, 0.1); transform: scale(1.05); }
+        
+        .pref-btn { flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; text-align: center; border: 1px solid #1f2d35; background: #121e24; color: #94a3b8; transition: 0.2s; }
+        .pref-btn.active { background: rgba(45, 212, 191, 0.15); border-color: #2dd4bf; color: #2dd4bf; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
         @media (max-width: 500px) {
           .hide-on-mobile { display: none !important; }
           .d-call-info { max-width: 50%; }
@@ -552,21 +786,43 @@ export default function ChatPage() {
       `}} />
 
       <aside className={`sidebar ${menuAberto ? 'open' : ''}`}>
-        <div className="sidebar-header" style={{ padding: '16px 20px', borderBottom: '1px solid #1f2d35', background: '#0b141a', display: 'flex', alignItems: 'center' }}>
-          <Link href="/" style={{ textDecoration: 'none', color: '#fff', fontSize: '20px', fontWeight: 'bold' }}>← Voltar</Link>
+        {/* BOTÃO VOLTAR SUPER CLEAN */}
+        <div className="sidebar-header">
+          <Link href="/" className="back-link">
+            ← Voltar para o Início
+          </Link>
         </div>
 
-        <div className="sidebar-profile">
-          <div className="sidebar-profile-info">
-            <div className="sidebar-avatar">{meuAvatar}</div>
-            <div className="sidebar-texts">
-              <span className="sidebar-name">{meuNomeReal}</span>
-              <span className="sidebar-bio">{meuStatusBio}</span>
+        {/* PERFIL EM CARD ELEGANTE COM BOTOES DE AÇÃO EM ÍCONE */}
+        <div className="profile-card-container">
+          <div className="profile-card">
+            <div className="profile-card-avatar">{meuAvatar}</div>
+            <div className="profile-card-details">
+              <span className="profile-card-name">{meuNomeReal}</span>
+              <span className="profile-card-tag">#{minhaTag}</span>
+              <span className="profile-card-bio">{meuStatusBio}</span>
+            </div>
+            
+            <div className="profile-actions-inline">
+              <button 
+                onClick={() => { setModalPerfilAberto(true); setAbaConfig('perfil'); }} 
+                className="icon-action-btn" 
+                title="Configurações"
+              >
+                ⚙️
+              </button>
+              <button 
+                onClick={() => { setModalAmigosAberto(true); setAbaAmigos('add'); setAmigoMensagem(""); }} 
+                className="icon-action-btn" 
+                title="Amigos"
+              >
+                👥
+              </button>
             </div>
           </div>
-          <button onClick={() => setModalPerfilAberto(true)} style={{ background: '#121e24', border: '1px solid #1f2d35', color: '#fff', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>⚙️ Editar</button>
         </div>
 
+        {/* LISTA DE CHATS ESTILIZADA */}
         <div className="chat-list">
           <div className={`chat-item ${isLagoa ? "active" : ""}`} onClick={() => { setAbaAtiva("lagoa"); setMenuAberto(false); }}>
             <div className="chat-item-avatar">🌊</div>
@@ -687,18 +943,45 @@ export default function ChatPage() {
           )}
 
           {isLagoa && !lagoaAtiva && !lagoaPendente && !procurando && (
-            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px' }}>
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px', background: '#0b141a', borderRadius: '16px', border: '1px solid #1f2d35', maxWidth: '450px' }}>
               <div className="duck-avatar" style={{ fontSize: '80px', marginBottom: '20px' }}>🎭</div>
               <h2 style={{ fontSize: "28px", fontWeight: "900", color: "#fff", marginBottom: "12px" }}>Lagoa Secreta</h2>
               <p style={{ color: "#94a3b8", fontSize: "15px", marginBottom: "32px", lineHeight: '1.5' }}>Mergulhe anonimamente. Você tem 6 minutos para conhecer alguém antes que a lagoa feche.</p>
-              <button onClick={procurarPato} style={{ padding: '16px 32px', fontSize: '16px', fontWeight: '900', background: '#2dd4bf', color: '#000', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(45,212,191,0.3)' }}>ENTRAR NA ÁGUA 🚀</button>
+              
+              <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                <label className="pro-label" style={{ display: 'block', marginBottom: '12px' }}>COM QUEM VOCÊ QUER CONVERSAR?</label>
+                
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <button type="button" onClick={() => togglePreferencia('qualquer')} className={`pref-btn ${preferenciasGenero.includes('qualquer') ? 'active' : ''}`}>
+                    Qualquer Pessoa
+                  </button>
+                  <button type="button" onClick={() => togglePreferencia('masculino')} className={`pref-btn ${preferenciasGenero.includes('masculino') ? 'active' : ''}`}>
+                    Masculinos
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" onClick={() => togglePreferencia('feminino')} className={`pref-btn ${preferenciasGenero.includes('feminino') ? 'active' : ''}`}>
+                    Femininos
+                  </button>
+                  <button type="button" onClick={() => togglePreferencia('nao-binario')} className={`pref-btn ${preferenciasGenero.includes('nao-binario') ? 'active' : ''}`}>
+                    Não-Binários
+                  </button>
+                </div>
+              </div>
+
+              <button onClick={procurarPato} style={{ width: '100%', padding: '16px 32px', fontSize: '16px', fontWeight: '900', background: '#2dd4bf', color: '#000', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(45,212,191,0.3)' }}>ENTRAR NA ÁGUA 🚀</button>
             </div>
           )}
 
           {isLagoa && procurando && (
-            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px' }}>
-              <div className="radar-spinner" style={{ margin: '0 auto 24px' }}></div>
-              <h2 style={{ color: "#2dd4bf", fontSize: '20px' }}>Procurando um Pato...</h2>
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px', background: '#0b141a', border: '1px solid #2dd4bf', borderRadius: '16px', maxWidth: '400px', boxShadow: '0 0 20px rgba(45,212,191,0.1)' }}>
+              <div className="radar-spinner" style={{ margin: '0 auto 24px', width: '60px', height: '60px', border: '4px solid rgba(45, 212, 191, 0.2)', borderTopColor: '#2dd4bf', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+              <h2 style={{ color: "#2dd4bf", fontSize: '20px', marginBottom: '8px' }}>Procurando um Pato...</h2>
+              <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '32px' }}>Aguardando alguém compatível pular na lagoa.</p>
+              
+              <button onClick={cancelarBusca} style={{ background: 'transparent', border: '1px solid #f43f5e', color: '#f43f5e', padding: '12px 24px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}>
+                Cancelar Busca ✖
+              </button>
             </div>
           )}
 
@@ -737,7 +1020,7 @@ export default function ChatPage() {
 
               <div className="chat-messages" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {msgsAtuais.map((msg) => {
-                  const meuNomeAqui = isLagoa ? meuNomeAnon : `${meuAvatar} ${meuNomeReal}`;
+                  const meuNomeAqui = isLagoa ? meuNomeAnon : `${meuAvatar} ${meuNomeReal}#${minhaTag}`;
                   const eMinha = msg.usuario === meuNomeAqui;
                   const eSistema = msg.usuario.includes("SISTEMA");
 
@@ -789,50 +1072,208 @@ export default function ChatPage() {
         </div>
       </main>
 
-      {/* MODAL DE PERFIL */}
+      {/* MODAL DE PERFIL TURBINADO COM NOTIFICAÇÕES */}
       {modalPerfilAberto && (
         <div onClick={fecharModalPerfil} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '400px', maxHeight: '90vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid #1f2d35' }}>
-              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>⚙️ Perfil & Áudio</h3>
-              <button onClick={fecharModalPerfil} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>✖</button>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid #1f2d35', background: '#0b141a' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px' }}>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>⚙️ Configurações</h3>
+                <button onClick={fecharModalPerfil} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>✖</button>
+              </div>
+              <div style={{ display: 'flex' }}>
+                <button onClick={() => setAbaConfig('perfil')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'perfil' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'perfil' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>👤 Perfil</button>
+                <button onClick={() => setAbaConfig('audio')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'audio' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'audio' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>🎙️ Áudio</button>
+                <button onClick={() => setAbaConfig('notificacoes')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'notificacoes' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'notificacoes' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>🔔 Alertas</button>
+              </div>
             </div>
             
             <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="pro-label">NOME DE EXIBIÇÃO</label>
-                  <input type="text" value={meuNomeReal} onChange={(e) => setMeuNomeReal(e.target.value)} className="pro-input" />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="pro-label">STATUS/BIO</label>
-                  <input type="text" value={meuStatusBio} onChange={(e) => setMeuStatusBio(e.target.value)} maxLength={50} className="pro-input" />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label className="pro-label">AVATAR</label>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    {["🦆", "🦅", "🦉", "🐧", "👑", "🚀"].map((emoji) => (
-                      <span key={emoji} onClick={() => setMeuAvatar(emoji)} className={`avatar-btn ${meuAvatar === emoji ? 'active' : ''}`}>{emoji}</span>
-                    ))}
+              
+              {abaConfig === 'perfil' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">NOME DE EXIBIÇÃO</label>
+                    <input type="text" value={meuNomeReal} onChange={(e) => setMeuNomeReal(e.target.value)} className="pro-input" />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">TAG DO USUÁRIO</label>
+                    <input type="text" value={`#${minhaTag}`} disabled className="pro-input" style={{ opacity: 0.6, cursor: 'not-allowed' }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">GÊNERO / IDENTIDADE</label>
+                    <select value={meuGenero} onChange={(e) => setMeuGenero(e.target.value)} className="pro-input" style={{ cursor: 'pointer' }}>
+                      <option value="prefiro-nao-dizer">Prefiro não dizer</option>
+                      <option value="masculino">Masculino</option>
+                      <option value="feminino">Feminino</option>
+                      <option value="nao-binario">Não-Binário</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">STATUS/BIO</label>
+                    <input type="text" value={meuStatusBio} onChange={(e) => setMeuStatusBio(e.target.value)} maxLength={50} className="pro-input" />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">AVATAR</label>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {["🦆", "🦅", "🦉", "🐧", "👑", "🚀"].map((emoji) => (
+                        <span key={emoji} onClick={() => setMeuAvatar(emoji)} className={`avatar-btn ${meuAvatar === emoji ? 'active' : ''}`}>{emoji}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div style={{ borderTop: "1px solid #1f2d35" }}></div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <label className="pro-label">VOLUME DE SAÍDA</label>
-                  <span style={{ fontSize: '12px', color: '#2dd4bf', fontWeight: 'bold' }}>{volumeSaida}%</span>
+              )}
+
+              {abaConfig === 'audio' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <label className="pro-label">VOLUME DE SAÍDA</label>
+                    <span style={{ fontSize: '12px', color: '#2dd4bf', fontWeight: 'bold' }}>{volumeSaida}%</span>
+                  </div>
+                  <input type="range" min="0" max="100" value={volumeSaida} onChange={(e) => setVolumeSaida(Number(e.target.value))} className="discord-slider" />
+                  <button type="button" onClick={alternarTesteMic} className={`btn-test-mic ${testandoMic ? 'active' : ''}`} style={{ marginTop: '10px' }}>
+                    {testandoMic ? '🛑 Parar Teste' : '🎙️ Ouvir meu microfone'}
+                  </button>
+                  <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5', marginTop: '8px' }}>Use o botão acima para falar e ouvir a sua própria voz para testar a qualidade do seu microfone e do seu alto-falante.</p>
                 </div>
-                <input type="range" min="0" max="100" value={volumeSaida} onChange={(e) => setVolumeSaida(Number(e.target.value))} className="discord-slider" />
-                <button type="button" onClick={alternarTesteMic} className={`btn-test-mic ${testandoMic ? 'active' : ''}`} style={{ marginTop: '10px' }}>
-                  {testandoMic ? '🛑 Parar Teste' : '🎙️ Ouvir meu microfone'}
-                </button>
-              </div>
+              )}
+
+              {abaConfig === 'notificacoes' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1, paddingRight: '16px' }}>
+                      <label className="pro-label" style={{ display: 'block', marginBottom: '4px' }}>NOTIFICAÇÕES DE ÁREA DE TRABALHO</label>
+                      <span style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.4', display: 'block' }}>
+                        Receba um alerta na tela do seu dispositivo quando receber mensagens, convites ou ligações enquanto não estiver com a aba do chat aberta.
+                      </span>
+                    </div>
+                    
+                    <button 
+                      onClick={handleToggleNotificacoes}
+                      style={{
+                        width: '52px', height: '28px', borderRadius: '14px', border: 'none',
+                        background: permiteNotificacoes ? '#10b981' : '#1f2d35',
+                        position: 'relative', cursor: 'pointer', transition: 'background 0.3s',
+                        flexShrink: 0
+                      }}
+                    >
+                      <div style={{
+                        width: '22px', height: '22px', borderRadius: '50%', background: '#fff',
+                        position: 'absolute', top: '3px', left: permiteNotificacoes ? '27px' : '3px',
+                        transition: 'left 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }} />
+                    </button>
+                  </div>
+                  
+                  {permiteNotificacoes && (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', padding: '12px', borderRadius: '8px', color: '#10b981', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
+                      ✅ O DuckZone está autorizado a enviar notificações.
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
             <div style={{ padding: '20px 24px', borderTop: '1px solid #1f2d35', background: '#080e12' }}>
               <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #2dd4bf, #10b981)', border: 'none', borderRadius: '12px', color: '#020d12', fontWeight: '900', cursor: 'pointer', fontSize: '15px' }}>
-                SALVAR ALTERAÇÕES 💾
+                SALVAR E FECHAR 💾
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE AMIGOS */}
+      {modalAmigosAberto && (
+        <div onClick={() => setModalAmigosAberto(false)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '450px', minHeight: '400px', maxHeight: '80vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid #1f2d35', background: '#0b141a' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px' }}>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>🦆 Amigos</h3>
+                <button onClick={() => setModalAmigosAberto(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>✖</button>
+              </div>
+              <div style={{ display: 'flex' }}>
+                <button onClick={() => setAbaAmigos('add')} style={{ flex: 1, padding: '12px', background: 'transparent', border: 'none', color: abaAmigos === 'add' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaAmigos === 'add' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>Adicionar</button>
+                <button onClick={() => setAbaAmigos('pending')} style={{ flex: 1, padding: '12px', background: 'transparent', border: 'none', color: abaAmigos === 'pending' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaAmigos === 'pending' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  Pendentes {listaPendentes.length > 0 && <span style={{ background: '#f43f5e', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', color: '#fff' }}>{listaPendentes.length}</span>}
+                </button>
+                <button onClick={() => setAbaAmigos('list')} style={{ flex: 1, padding: '12px', background: 'transparent', border: 'none', color: abaAmigos === 'list' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaAmigos === 'list' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>Meus Amigos</button>
+              </div>
+            </div>
+            
+            <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+              {abaAmigos === 'add' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>Digite a Tag do pato. Ex: <strong>Pato#0000</strong></p>
+                  <form onSubmit={enviarConviteAmizade} style={{ display: 'flex', gap: '8px' }}>
+                    <input type="text" placeholder="Nome#Tag" value={amigoTagInput} onChange={(e) => setAmigoTagInput(e.target.value)} className="pro-input" required style={{ flex: 1 }} />
+                    <button type="submit" style={{ padding: '0 20px', background: '#2dd4bf', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', color: '#020d12' }}>Enviar</button>
+                  </form>
+                  {amigoMensagem && <div style={{ color: amigoMensagem.includes('✅') ? '#10b981' : '#f43f5e', fontSize: '14px', fontWeight: 'bold', textAlign: 'center', background: amigoMensagem.includes('✅') ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)', padding: '12px', borderRadius: '8px' }}>{amigoMensagem}</div>}
+                </div>
+              )}
+
+              {abaAmigos === 'pending' && (
+                <div>
+                  {listaPendentes.length === 0 ? (
+                    <p style={{ color: '#64748b', textAlign: 'center', marginTop: '40px' }}>Nenhum convite pendente. 🦗</p>
+                  ) : (
+                    listaPendentes.map((req) => (
+                      <div key={req.id} className="friend-card" style={{ cursor: 'default' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div className="friend-avatar-wrap">
+                            {req.sender.avatar}
+                          </div>
+                          <div className="friend-info">
+                            <div className="friend-name">{req.sender.name}</div>
+                            <div style={{ marginTop: '4px' }}>
+                              <span className="friend-tag">#{req.sender.tag}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="btn-accept" onClick={() => responderConviteAmizade(req.id, 'ACCEPT')}>✓</button>
+                          <button className="btn-reject" onClick={() => responderConviteAmizade(req.id, 'REJECT')}>✕</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {abaAmigos === 'list' && (
+                <div>
+                  {listaAmigosAceitos.length === 0 ? (
+                    <p style={{ color: '#64748b', textAlign: 'center', marginTop: '40px' }}>Você ainda não tem amigos na lagoa. 🦆😢</p>
+                  ) : (
+                    listaAmigosAceitos.map((amizade) => {
+                      const amigo = amizade.senderId === meuIdBanco ? amizade.receiver : amizade.sender;
+                      return (
+                        <div key={amizade.id} className="friend-card" onClick={() => iniciarChatComAmigo(amizade.id)}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <div className="friend-avatar-wrap">
+                              {amigo.avatar}
+                            </div>
+                            <div className="friend-info">
+                              <div className="friend-name">
+                                {amigo.name}
+                              </div>
+                              <div style={{ marginTop: '4px' }}>
+                                <span className="friend-tag">#{amigo.tag}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="chat-action-btn">
+                            💬
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

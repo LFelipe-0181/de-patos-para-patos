@@ -26,36 +26,58 @@ app.prepare().then(() => {
     cors: { origin: "*" }
   });
 
-  let filaEspera = null;
+  let filaEspera = [];
   const salasConfirmacao = new Map(); 
 
   io.on("connection", (socket) => {
-    // 1. Entrar em sala privada (Ninhos Salvos)
     socket.on("entrar_sala_privada", ({ novaSalaPrivada }) => {
       socket.join(novaSalaPrivada);
     });
 
-    // 2. Procurar Parceiro na Lagoa Pública
-    socket.on("procurar_parceiro", () => {
-      if (filaEspera && filaEspera.id !== socket.id) {
-        const parceiro = filaEspera;
-        filaEspera = null;
+    // === NOVO SISTEMA DE MATCH MÚLTIPLO ===
+    socket.on("procurar_parceiro", (dadosFiltro) => {
+      const meuGenero = dadosFiltro?.meuGenero || "prefiro-nao-dizer";
+      // Agora o servidor espera receber uma lista (Array) de preferências
+      let minhasPreferencias = dadosFiltro?.preferencia || ["qualquer"];
+
+      // Limpa o usuário da fila caso ele já tenha clicado antes
+      filaEspera = filaEspera.filter(u => u.socket.id !== socket.id);
+
+      // Algoritmo Tinder dos Patos aprimorado (Match Duplo e Múltiplo)
+      const indexParceiro = filaEspera.findIndex(esperando => {
+        // 1. Eu sirvo para o outro? (As preferências dele incluem 'qualquer' OU incluem o meu gênero atual?)
+        const sirvoPraEle = esperando.preferencias.includes("qualquer") || esperando.preferencias.includes(meuGenero);
+        
+        // 2. O outro serve para mim? (Minhas preferências incluem 'qualquer' OU incluem o gênero atual dele?)
+        const eleServePraMim = minhasPreferencias.includes("qualquer") || minhasPreferencias.includes(esperando.meuGenero);
+        
+        return sirvoPraEle && eleServePraMim;
+      });
+
+      if (indexParceiro !== -1) {
+        // MATCH TOTAL! Tira o parceiro da fila
+        const parceiro = filaEspera.splice(indexParceiro, 1)[0];
 
         const salaId = `lagoa_${Date.now()}`;
         socket.join(salaId);
-        parceiro.join(salaId);
+        parceiro.socket.join(salaId);
 
         salasConfirmacao.set(salaId, new Set());
 
         io.to(socket.id).emit("parceiro_encontrado", { salaId, meuNome: "Pato 1", parceiroNome: "Pato 2" });
-        io.to(parceiro.id).emit("parceiro_encontrado", { salaId, meuNome: "Pato 2", parceiroNome: "Pato 1" });
+        io.to(parceiro.socket.id).emit("parceiro_encontrado", { salaId, meuNome: "Pato 2", parceiroNome: "Pato 1" });
       } else {
-        filaEspera = socket;
+        // SEM MATCH: Vai pra fila aguardar alguém compatível
+        filaEspera.push({ socket, meuGenero, preferencias: minhasPreferencias });
         socket.emit("aguardando_parceiro");
       }
     });
 
-    // 3. Confirmar Conexão + Timer de 6 Minutos
+    // === NOVA FUNÇÃO: CANCELAR BUSCA ===
+    socket.on("cancelar_busca", () => {
+      filaEspera = filaEspera.filter(u => u.socket.id !== socket.id);
+    });
+
     socket.on("confirmar_conexao", ({ salaId }) => {
       const confirmados = salasConfirmacao.get(salaId);
       if (confirmados) {
@@ -66,7 +88,6 @@ app.prepare().then(() => {
           io.to(salaId).emit("conexao_confirmada", { salaId });
           salasConfirmacao.delete(salaId);
 
-          // TIMER DE 6 MINUTOS NA LAGOA
           setTimeout(() => {
             io.to(salaId).emit("tempo_esgotado");
             io.in(salaId).socketsLeave(salaId);
@@ -75,8 +96,8 @@ app.prepare().then(() => {
       }
     });
 
-    // Sair da Lagoa manualmente
     socket.on("sair_da_lagoa", () => {
+      filaEspera = filaEspera.filter(u => u.socket.id !== socket.id);
       Array.from(socket.rooms).forEach(room => {
         if(room.startsWith("lagoa_")) {
           socket.leave(room);
@@ -85,7 +106,6 @@ app.prepare().then(() => {
       });
     });
 
-    // 4. Chat de Texto, Imagens e Áudio (RESTOUROU)
     socket.on("enviar_mensagem", (data) => {
       const msgId = `msg_${Date.now()}`;
       const hora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -104,7 +124,6 @@ app.prepare().then(() => {
       io.to(salaId).emit("mensagem_apagada", { salaId, msgId });
     });
 
-    // 5. Chamada de Voz (Sinalização WebRTC)
     socket.on("iniciar_chamada_voz", ({ salaId }) => socket.to(salaId).emit("recebeu_chamada_voz"));
     socket.on("aceitar_chamada_voz", ({ salaId }) => socket.to(salaId).emit("chamada_voz_aceita_pelo_parceiro"));
     socket.on("recusar_chamada_voz", ({ salaId }) => socket.to(salaId).emit("chamada_voz_recusada"));
@@ -113,7 +132,6 @@ app.prepare().then(() => {
     socket.on("webrtc_answer", ({ salaId, answer }) => socket.to(salaId).emit("webrtc_answer", { answer }));
     socket.on("webrtc_ice_candidate", ({ salaId, candidate }) => socket.to(salaId).emit("webrtc_ice_candidate", { candidate }));
 
-    // 6. Migração para Ninho Privado
     socket.on("solicitar_chat_privado", ({ salaId, meuNome }) => {
       socket.to(salaId).emit("recebeu_convite_privado", { solicitante: meuNome });
     });
@@ -126,12 +144,8 @@ app.prepare().then(() => {
       }
     });
 
-    // 7. Tratamento de Desconexão
     socket.on("disconnect", () => {
-      if (filaEspera && filaEspera.id === socket.id) {
-        filaEspera = null;
-      }
-      // Avisa as salas (Lagoa ou Ninhos) que o usuário saiu
+      filaEspera = filaEspera.filter(u => u.socket.id !== socket.id);
       Array.from(socket.rooms).forEach(room => {
         if (room !== socket.id) socket.to(room).emit("parceiro_desconectou");
       });

@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. USUÁRIO E AMIZADES
+model User {
+  id              String       @id @default(uuid())
+  email           String       @unique
+  name            String
+  tag             String?      // Opcional para não quebrar nada antigo
+  avatar          String       @default("🦆")
+  bio             String?      @default("Nadando nas águas profundas...")
+  gender          String?      @default("qualquer") // <--- CAMPO DE GÊNERO ADICIONADO AQUI
+  createdAt       DateTime     @default(now())
+
+  // Amizades
+  friendsSent     Friendship[] @relation("UserFriendsSent")
+  friendsReceived Friendship[] @relation("UserFriendsReceived")
+
+  // Servidores e Mensagens
+  serversOwned    Server[]     @relation("ServerOwner")
+  serverMembers   Member[]
+  messages        Message[]
+}
+
+model Friendship {
+  id          String   @id @default(uuid())
+  status      String   @default("PENDING") // PENDING, ACCEPTED, BLOCKED
+  
+  senderId    String
+  sender      User     @relation("UserFriendsSent", fields: [senderId], references: [id], onDelete: Cascade)
+  
+  receiverId  String
+  receiver    User     @relation("UserFriendsReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([senderId, receiverId])
+}
+
+// 2. SERVIDORES / GRUPOS E CANAIS
+model Server {
+  id          String    @id @default(uuid())
+  name        String
+  icon        String?   @default("🦆")
+  inviteCode  String    @unique @default(uuid())
+
+  ownerId     String
+  owner       User      @relation("ServerOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  members     Member[]
+  channels    Channel[]
+
+  createdAt   DateTime  @default(now())
+}
+
+model Member {
+  id        String   @id @default(uuid())
+  role      String   @default("MEMBER") // ADMIN, MEMBER
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  serverId  String
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  joinedAt  DateTime @default(now())
+
+  @@unique([userId, serverId])
+}
+
+model Channel {
+  id        String    @id @default(uuid())
+  name      String    // Ex: "geral", "memes"
+  type      String    @default("TEXT") // TEXT, VOICE
+
+  serverId  String
+  server    Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  messages  Message[]
+
+  createdAt DateTime  @default(now())
+}
+
+// 3. MENSAGENS
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+  image     String?
+  audio     String?
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  channelId String?  // Nulo se for conversa privada (DM)
+  channel   Channel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
