@@ -112,7 +112,7 @@ export default function ChatPage() {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (lagoaAtiva) {
-      setTempoRestante(360); // 6 minutos = 360 segundos
+      setTempoRestante(360);
       interval = setInterval(() => {
         setTempoRestante((prev) => {
           if (prev !== null && prev > 0) return prev - 1;
@@ -247,19 +247,17 @@ export default function ChatPage() {
 
     socket.on("webrtc_offer", async (data) => {
       try {
-        const stream = await capturarAudioNativo();
-        localStreamRef.current = stream;
         const pc = obterOuCriarPeerConnection();
-        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
+        // AQUI ESTAVA O ERRO 1: Captura duplicada de mic removida! Apenas aplicamos a oferta.
         await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         
-        socketRef.current?.emit("webrtc_answer", { salaId: abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current, answer });
+        const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+        socketRef.current?.emit("webrtc_answer", { salaId: salaAlvo, answer });
         setChamadaAtiva(true);
       } catch (err) {
-        console.error("Erro ao aceitar oferta WebRTC:", err);
+        console.error("Erro ao processar oferta:", err);
       }
     });
 
@@ -268,7 +266,7 @@ export default function ChatPage() {
     });
 
     socket.on("webrtc_ice_candidate", async (data) => {
-      if (peerConnectionRef.current && data.candidate) { try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch {} }
+      if (peerConnectionRef.current && data.candidate) { try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) { console.error(e) } }
     });
 
     socket.on("chamada_voz_recusada", () => { pararRingtone(); alert("O outro pato recusou a chamada."); encerrarChamadaLocal(); });
@@ -297,7 +295,7 @@ export default function ChatPage() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [lagoaMensagens, privados, abaAtiva]);
 
-  // ====== WEBRTC E CHAMADAS (COM SERVIDOR TURN & DESBLOQUEIO AUTO-PLAY) ======
+  // ====== WEBRTC E CHAMADAS (COM SERVIDOR TURN) ======
   const obterOuCriarPeerConnection = () => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
@@ -325,8 +323,10 @@ export default function ChatPage() {
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
+        // AQUI ESTAVA O ERRO 2: Consertado para usar sempre os Refs atualizados!
+        const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
         socketRef.current?.emit("webrtc_ice_candidate", {
-          salaId: abaAtiva !== "lagoa" ? abaAtiva : lagoaId,
+          salaId: salaAlvo,
           candidate: e.candidate,
         });
       }
@@ -499,7 +499,7 @@ export default function ChatPage() {
 
   return (
     <div className="app-layout">
-      {/* REPRODUTORES DE ÁUDIO INVISÍVEIS (playsInline adicionado para iOS e Móbiles) */}
+      {/* GARANTIA DE REPRODUÇÃO NO MOBILE: controls={false} e playsInline */}
       <audio ref={remoteAudioRef} autoPlay playsInline controls={false} style={{ display: 'none' }} />
       <audio ref={testAudioRef} autoPlay playsInline muted={false} style={{ display: 'none' }} />
 
