@@ -28,7 +28,7 @@ export default function ChatPage() {
   const [meuAvatar, setMeuAvatar] = useState<string>("🦆");
   const [modalPerfilAberto, setModalPerfilAberto] = useState<boolean>(false);
 
-  // ÁUDIO
+  // ÁUDIO E WEBRTC QUEUE
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
   const [microfoneMutado, setMicrofoneMutado] = useState<boolean>(false);
   const [audioMutado, setAudioMutado] = useState<boolean>(false);
@@ -37,6 +37,7 @@ export default function ChatPage() {
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
   const testStreamRef = useRef<MediaStream | null>(null);
+  const iceCandidatesQueue = useRef<RTCIceCandidateInit[]>([]); // Fila de pacotes de rede para o 4G
 
   // TIMER DA LAGOA
   const [tempoRestante, setTempoRestante] = useState<number | null>(null);
@@ -196,7 +197,106 @@ export default function ChatPage() {
     }
   }, [privados]);
 
-  // ====== SOCKET CONEXÃO ======
+  // ====== WEBRTC CORE (IMUNE A STALE STATE E COM FILA) ======
+  const obterOuCriarPeerConnection = () => {
+    if (peerConnectionRef.current) return peerConnectionRef.current;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        {
+          urls: "turn:global.relay.metered.ca:80",
+          username: "df6234af237090e8e4cf0f65",
+          credential: "BVHUUzvhydFv9T9m",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443",
+          username: "df6234af237090e8e4cf0f65",
+          credential: "BVHUUzvhydFv9T9m",
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443?transport=tcp",
+          username: "df6234af237090e8e4cf0f65",
+          credential: "BVHUUzvhydFv9T9m",
+        },
+      ]
+    });
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+        socketRef.current?.emit("webrtc_ice_candidate", {
+          salaId: salaAlvo,
+          candidate: e.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (e) => {
+      if (remoteAudioRef.current) {
+        if (e.streams && e.streams[0]) {
+          remoteAudioRef.current.srcObject = e.streams[0];
+        } else {
+          // Fallback brutal para garantir a criação do stream
+          const stream = new MediaStream();
+          stream.addTrack(e.track);
+          remoteAudioRef.current.srcObject = stream;
+        }
+        
+        const playPromise = remoteAudioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            window.addEventListener('click', () => {
+              remoteAudioRef.current?.play();
+            }, { once: true });
+          });
+        }
+      }
+    };
+
+    peerConnectionRef.current = pc;
+    return pc;
+  };
+
+  const enviarOfertaWebRTC = async () => {
+    // PROTEÇÃO: Usa a referência viva para nunca pegar o estado antigo "lagoa"
+    const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+    if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
+
+    try {
+      const stream = await capturarAudioNativo();
+      localStreamRef.current = stream;
+      
+      const pc = obterOuCriarPeerConnection();
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      
+      socketRef.current?.emit("webrtc_offer", { salaId: salaAlvo, offer });
+    } catch { alert("Microfone não encontrado ou permissão negada."); }
+  };
+
+  const atenderChamadaVoz = async () => {
+    pararRingtone();
+    const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+    if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
+
+    try {
+      const stream = await capturarAudioNativo();
+      localStreamRef.current = stream;
+      
+      const pc = obterOuCriarPeerConnection();
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+      socketRef.current?.emit("aceitar_chamada_voz", { salaId: salaAlvo });
+      setChamadaRecebida(false); 
+      setChamadaAtiva(true);
+    } catch { alert("Microfone não encontrado ou permissão negada."); }
+  };
+
+  // ====== SOCKET LISTENERS ======
   useEffect(() => {
     const socket = io();
     socketRef.current = socket;
@@ -243,13 +343,26 @@ export default function ChatPage() {
     });
 
     socket.on("recebeu_chamada_voz", () => { setChamadaRecebida(true); tocarRingtone('recebendo'); });
-    socket.on("chamada_voz_aceita_pelo_parceiro", async () => { pararRingtone(); setChamadaAtiva(true); setStatusConvite(null); await enviarOfertaWebRTC(); });
+    
+    socket.on("chamada_voz_aceita_pelo_parceiro", async () => { 
+      pararRingtone(); 
+      setChamadaAtiva(true); 
+      setStatusConvite(null); 
+      // Executa enviando a referência atualizada!
+      await enviarOfertaWebRTC(); 
+    });
 
     socket.on("webrtc_offer", async (data) => {
       try {
         const pc = obterOuCriarPeerConnection();
-        // AQUI ESTAVA O ERRO 1: Captura duplicada de mic removida! Apenas aplicamos a oferta.
         await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+        
+        // Esvazia a fila de ICE Candidates retidos
+        iceCandidatesQueue.current.forEach(async (c) => {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+        });
+        iceCandidatesQueue.current = [];
+
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         
@@ -262,11 +375,28 @@ export default function ChatPage() {
     });
 
     socket.on("webrtc_answer", async (data) => {
-      if (peerConnectionRef.current) { await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); setChamadaAtiva(true); }
+      if (peerConnectionRef.current) { 
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); 
+        
+        // Esvazia a fila de ICE Candidates retidos
+        iceCandidatesQueue.current.forEach(async (c) => {
+          try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(c)); } catch(e){}
+        });
+        iceCandidatesQueue.current = [];
+        
+        setChamadaAtiva(true); 
+      }
     });
 
     socket.on("webrtc_ice_candidate", async (data) => {
-      if (peerConnectionRef.current && data.candidate) { try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) { console.error(e) } }
+      if (data.candidate) { 
+        if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
+          try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) {} 
+        } else {
+          // Fila de retenção vital para conexões lentas ou 4G
+          iceCandidatesQueue.current.push(data.candidate);
+        }
+      }
     });
 
     socket.on("chamada_voz_recusada", () => { pararRingtone(); alert("O outro pato recusou a chamada."); encerrarChamadaLocal(); });
@@ -295,101 +425,21 @@ export default function ChatPage() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [lagoaMensagens, privados, abaAtiva]);
 
-  // ====== WEBRTC E CHAMADAS (COM SERVIDOR TURN) ======
-  const obterOuCriarPeerConnection = () => {
-    if (peerConnectionRef.current) return peerConnectionRef.current;
-
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        {
-          urls: "turn:global.relay.metered.ca:80",
-          username: "df6234af237090e8e4cf0f65",
-          credential: "BVHUUzvhydFv9T9m",
-        },
-        {
-          urls: "turn:global.relay.metered.ca:443",
-          username: "df6234af237090e8e4cf0f65",
-          credential: "BVHUUzvhydFv9T9m",
-        },
-        {
-          urls: "turn:global.relay.metered.ca:443?transport=tcp",
-          username: "df6234af237090e8e4cf0f65",
-          credential: "BVHUUzvhydFv9T9m",
-        },
-      ]
-    });
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        // AQUI ESTAVA O ERRO 2: Consertado para usar sempre os Refs atualizados!
-        const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
-        socketRef.current?.emit("webrtc_ice_candidate", {
-          salaId: salaAlvo,
-          candidate: e.candidate,
-        });
-      }
-    };
-
-    pc.ontrack = (e) => {
-      if (remoteAudioRef.current && e.streams[0]) {
-        remoteAudioRef.current.srcObject = e.streams[0];
-        const playPromise = remoteAudioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            window.addEventListener('click', () => {
-              remoteAudioRef.current?.play();
-            }, { once: true });
-          });
-        }
-      }
-    };
-
-    peerConnectionRef.current = pc;
-    return pc;
-  };
-
+  // ====== FUNÇÕES DA UI ======
   const solicitarChamadaVoz = () => {
-    if (abaAtiva === "lagoa") return;
-    socketRef.current?.emit("iniciar_chamada_voz", { salaId: abaAtiva });
+    const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+    if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
+    socketRef.current?.emit("iniciar_chamada_voz", { salaId: salaAlvo });
     setStatusConvite("Chamando Pato... 📞");
     tocarRingtone('chamando');
   };
 
-  const atenderChamadaVoz = async () => {
-    pararRingtone();
-    if (abaAtiva === "lagoa") return;
-    try {
-      const stream = await capturarAudioNativo();
-      localStreamRef.current = stream;
-      
-      const pc = obterOuCriarPeerConnection();
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-      socketRef.current?.emit("aceitar_chamada_voz", { salaId: abaAtiva });
-      setChamadaRecebida(false); 
-      setChamadaAtiva(true);
-    } catch { alert("Microfone não encontrado ou permissão negada."); }
+  const recusarChamadaVoz = () => { 
+    pararRingtone(); 
+    const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+    if (salaAlvo && abaAtivaRef.current !== "lagoa") socketRef.current?.emit("recusar_chamada_voz", { salaId: salaAlvo }); 
+    setChamadaRecebida(false); 
   };
-
-  const enviarOfertaWebRTC = async () => {
-    if (abaAtiva === "lagoa") return;
-    try {
-      const stream = await capturarAudioNativo();
-      localStreamRef.current = stream;
-      
-      const pc = obterOuCriarPeerConnection();
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      
-      socketRef.current?.emit("webrtc_offer", { salaId: abaAtiva, offer });
-    } catch { alert("Microfone não encontrado ou permissão negada."); }
-  };
-
-  const recusarChamadaVoz = () => { pararRingtone(); if (abaAtiva !== "lagoa") socketRef.current?.emit("recusar_chamada_voz", { salaId: abaAtiva }); setChamadaRecebida(false); };
 
   const alternarMuteMicrofone = () => {
     setMicrofoneMutado((prev) => {
@@ -414,12 +464,17 @@ export default function ChatPage() {
     pararRingtone();
     if (peerConnectionRef.current) { peerConnectionRef.current.close(); peerConnectionRef.current = null; }
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
+    iceCandidatesQueue.current = [];
     setChamadaAtiva(false); setChamadaRecebida(false); setMicrofoneMutado(false); setAudioMutado(false); setStatusConvite(null);
   };
 
-  const desligarChamada = () => { pararRingtone(); if (abaAtiva !== "lagoa") socketRef.current?.emit("encerrar_chamada_voz", { salaId: abaAtiva }); encerrarChamadaLocal(); };
+  const desligarChamada = () => { 
+    pararRingtone(); 
+    const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+    if (salaAlvo && abaAtivaRef.current !== "lagoa") socketRef.current?.emit("encerrar_chamada_voz", { salaId: salaAlvo }); 
+    encerrarChamadaLocal(); 
+  };
 
-  // ====== FUNÇÕES DA UI ======
   const procurarPato = () => { setProcurando(true); socketRef.current?.emit("procurar_parceiro"); };
   const aceitarConexao = () => { if (lagoaPendente && !jaAceitou) { setJaAceitou(true); socketRef.current?.emit("confirmar_conexao", { salaId: lagoaPendente }); } };
   const recusarConexao = () => { setLagoaPendente(null); setJaAceitou(false); setConfirmados(0); procurarPato(); };
@@ -632,7 +687,7 @@ export default function ChatPage() {
                 <div className="d-call-dot"></div>
                 <div className="d-call-text">
                   <span className="d-call-title">Voz Conectada</span>
-                  <span className="d-call-subtitle">Ninho Privado • TURN Relay Ativo</span>
+                  <span className="d-call-subtitle">Ninho Privado • Conexão Segura</span>
                 </div>
               </div>
               <div className="d-call-actions">
