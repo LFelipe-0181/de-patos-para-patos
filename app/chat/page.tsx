@@ -932,6 +932,15 @@ export default function ChatPage() {
         .btn-enviar { background: linear-gradient(135deg, #0ea5e9, #2dd4bf); color: #020617; border: none; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3); transition: transform 0.2s; }
         .btn-enviar:hover { transform: scale(1.05); }
 
+        /* CLASSES EXTRÍDAS DO INLINE PARA PREVENIR ERROS DE COMPILAÇÃO DO SWC */
+        .status-convite-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #2dd4bf; color: #fff; padding: 12px 20px; text-align: center; border-radius: 12px; margin: 0 auto 20px; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
+        .status-convite-box.is-chamando { display: flex; justify-content: space-between; align-items: center; }
+        .convite-privado-box { background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05)); border: 1px solid #10b981; padding: 20px; text-align: center; border-radius: 20px; margin: 0 auto 20px; max-width: 400px; backdrop-filter: blur(10px); box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .timer-lagoa { padding: 12px; text-align: center; font-size: 12px; font-weight: 800; border-radius: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 12px 16px; transition: all 0.3s; }
+        .timer-lagoa.safe { background-color: rgba(45, 212, 191, 0.05); border: 1px dashed #2dd4bf; color: #2dd4bf; }
+        .timer-lagoa.danger { background-color: rgba(244, 63, 94, 0.1); border: 1px dashed #f43f5e; color: #f43f5e; }
+        .matching-card { margin: auto; text-align: center; padding: 40px; background: rgba(15, 23, 42, 0.8); border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); max-width: 450px; backdrop-filter: blur(20px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+
         /* PAINEL DE LIGAÇÃO */
         .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
         .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #2dd4bf; border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px rgba(45,212,191,0.5); margin-top: -5px; }
@@ -943,7 +952,7 @@ export default function ChatPage() {
         @keyframes pulse-neon { 0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(45, 212, 191, 0); } 100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0); } }
         .d-call-text { display: flex; flex-direction: column; }
         .d-call-title { color: #2dd4bf; font-weight: 800; font-size: 14px; letter-spacing: 0.5px; }
-        .d-call-subtitle { color: #949ba4; font-size: 12px; font-weight: 500; }
+        .d-call-subtitle { color: #94a3b8; font-size: 12px; font-weight: 500; }
         .d-call-actions { display: flex; gap: 10px; }
         .d-action-btn { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid transparent; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: 0.2s; }
         .d-action-btn:hover { background: rgba(255,255,255,0.1); }
@@ -1158,13 +1167,13 @@ export default function ChatPage() {
 
           <div className="chat-messages">
             {isLagoa && lagoaAtiva && tempoRestante !== null && (
-              <div style={{ backgroundColor: tempoRestante <= 60 ? 'rgba(244, 63, 94, 0.1)' : 'rgba(45, 212, 191, 0.05)', border: `1px dashed ${tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf'}`, color: tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf', padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: '800', borderRadius: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              <div className={`timer-lagoa ${tempoRestante <= 60 ? 'danger' : 'safe'}`}>
                 {tempoRestante <= 60 ? "⚠️ " : "⏳ "} A Lagoa fechará em {Math.floor(tempoRestante / 60)}:{(tempoRestante % 60).toString().padStart(2, '0')}
               </div>
             )}
 
             {isLagoa && !lagoaAtiva && !lagoaPendente && !procurando && (
-              <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)', maxWidth: '450px', backdropFilter: 'blur(20px)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+              <div className="matching-card" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
                 <div className="duck-avatar" style={{ fontSize: '80px', marginBottom: '20px', filter: 'drop-shadow(0 0 20px rgba(45,212,191,0.5))' }}>🎭</div>
                 <h2 style={{ fontSize: "28px", fontWeight: "900", color: "#fff", marginBottom: "12px", letterSpacing: '1px' }}>Lagoa Secreta</h2>
                 <p style={{ color: "#94a3b8", fontSize: "15px", marginBottom: "32px", lineHeight: '1.6' }}>Mergulhe anonimamente. Você tem 6 minutos para conhecer alguém antes que a lagoa feche.</p>
@@ -1187,7 +1196,7 @@ export default function ChatPage() {
             )}
 
             {isLagoa && procurando && (
-              <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid #2dd4bf', borderRadius: '24px', maxWidth: '400px', boxShadow: '0 0 40px rgba(45,212,191,0.15)', backdropFilter: 'blur(20px)' }}>
+              <div className="matching-card" style={{ border: '1px solid #2dd4bf', boxShadow: '0 0 40px rgba(45,212,191,0.15)' }}>
                 <div className="radar-spinner" style={{ margin: '0 auto 30px', width: '70px', height: '70px', border: '4px solid rgba(45, 212, 191, 0.1)', borderTopColor: '#2dd4bf', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                 <h2 style={{ color: "#2dd4bf", fontSize: '22px', marginBottom: '12px', letterSpacing: '1px', fontWeight: '900' }}>Rastreando...</h2>
                 <p style={{ color: '#94a3b8', fontSize: '15px', marginBottom: '32px' }}>Buscando um pato compatível nas redondezas.</p>
@@ -1199,7 +1208,7 @@ export default function ChatPage() {
             )}
 
             {isLagoa && lagoaPendente && !lagoaAtiva && (
-              <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid #2dd4bf', borderRadius: '24px', backdropFilter: 'blur(20px)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+              <div className="matching-card" style={{ border: '1px solid #2dd4bf', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
                 <h2 style={{ color: "#fff", marginBottom: "16px", fontSize: '26px', fontWeight: '900' }}>Alvo Encontrado!</h2>
                 <div style={{ display: "inline-block", background: "rgba(45,212,191,0.15)", color: "#2dd4bf", padding: "8px 20px", borderRadius: "20px", fontSize: "14px", fontWeight: "900", marginBottom: "24px", border: '1px solid rgba(45,212,191,0.3)' }}>
                   Aguardando aceitação: {confirmados}/2
@@ -1218,7 +1227,7 @@ export default function ChatPage() {
             {(isLagoa ? lagoaAtiva : true) && (
               <>
                 {statusConvite && (
-                  <div style={{ background: "rgba(15, 23, 42, 0.8)", border: "1px solid #2dd4bf", color: "#fff", padding: "12px 20px", textAlign: "center", borderRadius: "12px", margin: "0 auto 20px", display: (!isLagoa && statusConvite.includes("Chamando")) ? "flex" : "block", justifyContent: "space-between", alignItems: "center", maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)' }}>
+                  <div className={`status-convite-box ${(!isLagoa && statusConvite.includes("Chamando")) ? 'is-chamando' : ''}`}>
                     <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{statusConvite}</span>
                     {!isLagoa && statusConvite.includes("Chamando") && (
                        <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", boxShadow: '0 2px 8px rgba(244,63,94,0.4)' }}>Cancelar</button>
@@ -1227,7 +1236,7 @@ export default function ChatPage() {
                 )}
 
                 {isLagoa && convitePendente && (
-                  <div style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05))", border: "1px solid #10b981", padding: "20px", textAlign: "center", borderRadius: "20px", margin: "0 auto 20px", maxWidth: '400px', backdropFilter: 'blur(10px)', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                  <div className="convite-privado-box">
                     <div style={{ fontSize: '30px', marginBottom: '10px' }}>🔐</div>
                     <p style={{ color: "#fff", fontWeight: "900", marginBottom: "20px", fontSize: '16px' }}>{convitePendente} quer te levar pro Privado!</p>
                     <div style={{ display: 'flex', gap: '12px' }}>
@@ -1366,7 +1375,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* MODAL DE CONFIGURAÇÕES (CORRIGIDO OS DOIS PONTOS `:`) */}
+      {/* MODAL DE CONFIGURAÇÕES */}
       {modalPerfilAberto && (
         <div onClick={fecharModalPerfil} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '400px', maxHeight: '90vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
