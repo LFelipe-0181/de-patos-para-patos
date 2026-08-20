@@ -18,7 +18,8 @@ interface ChatPrivado {
   id: string;
   nomeCustom?: string;
   mensagens: Mensagem[];
-  naoLida?: boolean; // 🔴 NOVO: Propriedade para controlar a bolinha vermelha
+  naoLida?: boolean;
+  icone?: string; // 🦆 NOVO: Permite alterar o ícone do chat
 }
 
 export default function ChatPage() {
@@ -49,7 +50,21 @@ export default function ChatPage() {
 
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
 
+  // 🎙️ NOVO: Controle de Ganho do Microfone e Saída
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
+  const [ganhoMicrofone, setGanhoMicrofone] = useState<number>(100);
+  const ganhoMicrofoneRef = useRef<number>(100);
+  useEffect(() => { ganhoMicrofoneRef.current = ganhoMicrofone; }, [ganhoMicrofone]);
+  
+  const micGainNodeRef = useRef<GainNode | null>(null);
+  const micAudioCtxRef = useRef<AudioContext | null>(null);
+  
+  useEffect(() => {
+    if (micGainNodeRef.current) {
+      micGainNodeRef.current.gain.value = ganhoMicrofone / 100;
+    }
+  }, [ganhoMicrofone]);
+
   const [microfoneMutado, setMicrofoneMutado] = useState<boolean>(false);
   const [audioMutado, setAudioMutado] = useState<boolean>(false);
   const [testandoMic, setTestandoMic] = useState<boolean>(false);
@@ -166,7 +181,8 @@ export default function ChatPage() {
                   id: roomId,
                   nomeCustom: amigo.name,
                   mensagens: [],
-                  naoLida: false
+                  naoLida: false,
+                  icone: "🔒"
                 });
                 mudou = true;
               }
@@ -228,7 +244,7 @@ export default function ChatPage() {
 
   const [lagoaPendente, setLagoaPendente] = useState<string | null>(null);
   const [lagoaAtiva, setLagoaAtiva] = useState<boolean>(false);
-  const [lagoaNaoLida, setLagoaNaoLida] = useState<boolean>(false); // 🔴 NOVO: Bolinha para a Lagoa
+  const [lagoaNaoLida, setLagoaNaoLida] = useState<boolean>(false);
   const [procurando, setProcurando] = useState<boolean>(false);
   
   const [confirmados, setConfirmados] = useState<number>(0);
@@ -261,7 +277,6 @@ export default function ChatPage() {
     setAbaAtiva(roomId);
     setMenuAberto(false);
     setModalAmigosAberto(false);
-    // Limpa a notificação ao abrir
     setPrivados(prev => prev.map(p => p.id === roomId ? { ...p, naoLida: false } : p));
   };
 
@@ -288,16 +303,41 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [lagoaAtiva]);
 
+  // 🎙️ NOVO: Captura de áudio nativo com controle de Ganho (API Web Audio)
   const capturarAudioNativo = async (): Promise<MediaStream> => {
-    return await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    const rawStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false }
     });
+    
+    if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") {
+      micAudioCtxRef.current.close();
+    }
+    
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    micAudioCtxRef.current = audioCtx;
+    
+    const source = audioCtx.createMediaStreamSource(rawStream);
+    const gainNode = audioCtx.createGain();
+    
+    // Aplica o ganho escolhido no slider (Ex: 100% = 1.0, 200% = 2.0)
+    gainNode.gain.value = ganhoMicrofoneRef.current / 100;
+    micGainNodeRef.current = gainNode;
+    
+    const destination = audioCtx.createMediaStreamDestination();
+    source.connect(gainNode);
+    gainNode.connect(destination);
+    
+    return destination.stream;
   };
 
   const alternarTesteMic = async () => {
     if (testandoMic) {
       if (testStreamRef.current) testStreamRef.current.getTracks().forEach(t => t.stop());
       if (testAudioRef.current) testAudioRef.current.srcObject = null;
+      if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") {
+         micAudioCtxRef.current.close();
+         micAudioCtxRef.current = null;
+      }
       setTestandoMic(false);
     } else {
       try {
@@ -456,18 +496,16 @@ export default function ChatPage() {
       if (data.salaId.startsWith("ninho_")) {
         setPrivados((prev) => {
           const existe = prev.some(c => c.id === data.salaId);
-          // 🔴 NOVO: Verifica se o chat da mensagem é o que está ativo no momento
           const ehAbaAtiva = data.salaId === abaAtivaRef.current;
 
           if (existe) {
             return prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg], naoLida: !ehAbaAtiva || chat.naoLida } : chat);
           } else {
-            return [...prev, { id: data.salaId, nomeCustom: "Novo Amigo", mensagens: [novaMsg], naoLida: !ehAbaAtiva }];
+            return [...prev, { id: data.salaId, nomeCustom: "Novo Amigo", mensagens: [novaMsg], naoLida: !ehAbaAtiva, icone: "🔒" }];
           }
         });
       } else { 
         setLagoaMensagens((prev) => [...prev, novaMsg]); 
-        // 🔴 NOVO: Se receber mensagem na lagoa e eu não estiver nela, acende a bolinha
         if (abaAtivaRef.current !== "lagoa") setLagoaNaoLida(true);
       }
 
@@ -535,7 +573,7 @@ export default function ChatPage() {
       socket.emit("entrar_sala_privada", { novaSalaPrivada: novaId });
       setPrivados((prev) => {
         if (prev.some(p => p.id === novaId)) return prev;
-        return [...prev, { id: novaId, mensagens: [{ id: `sys_${Date.now()}`, usuario: "SISTEMA 🔒", mensagem: `Vocês entraram em um Ninho Privado! Suas identidades foram reveladas.`, hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }], naoLida: false }];
+        return [...prev, { id: novaId, mensagens: [{ id: `sys_${Date.now()}`, usuario: "SISTEMA 🔒", mensagem: `Vocês entraram em um Ninho Privado! Suas identidades foram reveladas.`, hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }], naoLida: false, icone: "🔒" }];
       });
       setAbaAtiva(novaId); setLagoaAtiva(false); setConvitePendente(null); setStatusConvite(null); setLagoaNaoLida(false);
     });
@@ -564,9 +602,18 @@ export default function ChatPage() {
 
   const procurarPato = () => { 
     setProcurando(true); 
+    
+    // 🦆 NOVO: Coleta os e-mails dos amigos para enviar ao servidor evitar na fila
+    const emailsAmigos = listaAmigosAceitos.map(amizade => {
+       const amigo = amizade.senderId === meuIdBanco ? amizade.receiver : amizade.sender;
+       return amigo.email;
+    });
+
     socketRef.current?.emit("procurar_parceiro", {
       meuGenero: meuGenero,
-      preferencia: preferenciasGenero
+      preferencia: preferenciasGenero,
+      meuEmail: session?.user?.email, 
+      amigosEmails: emailsAmigos
     }); 
   };
 
@@ -623,6 +670,10 @@ export default function ChatPage() {
     if (peerConnectionRef.current) { peerConnectionRef.current.close(); peerConnectionRef.current = null; }
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
     iceCandidatesQueue.current = [];
+    if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") {
+       micAudioCtxRef.current.close();
+       micAudioCtxRef.current = null;
+    }
     setChamadaAtiva(false); setChamadaRecebida(false); setMicrofoneMutado(false); setAudioMutado(false); setStatusConvite(null);
   };
 
@@ -671,6 +722,10 @@ export default function ChatPage() {
           };
           reader.readAsDataURL(audioBlob);
           stream.getTracks().forEach((track) => track.stop());
+          if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") {
+             micAudioCtxRef.current.close();
+             micAudioCtxRef.current = null;
+          }
         };
         recorder.start();
         setGravandoAudioMsg(true);
@@ -747,7 +802,6 @@ export default function ChatPage() {
         .chat-item-title { font-weight: 700; font-size: 14px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chat-item-sub { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 
-        /* 🔴 NOVO: Estilo da bolinha de mensagem não lida */
         .unread-dot {
           width: 10px;
           height: 10px;
@@ -808,14 +862,12 @@ export default function ChatPage() {
       `}} />
 
       <aside className={`sidebar ${menuAberto ? 'open' : ''}`}>
-        {/* BOTÃO VOLTAR SUPER CLEAN */}
         <div className="sidebar-header">
           <Link href="/" className="back-link">
             ← Voltar para o Início
           </Link>
         </div>
 
-        {/* PERFIL EM CARD ELEGANTE COM BOTOES DE AÇÃO EM ÍCONE */}
         <div className="profile-card-container">
           <div className="profile-card">
             <div className="profile-card-avatar">{meuAvatar}</div>
@@ -826,27 +878,13 @@ export default function ChatPage() {
             </div>
             
             <div className="profile-actions-inline">
-              <button 
-                onClick={() => { setModalPerfilAberto(true); setAbaConfig('perfil'); }} 
-                className="icon-action-btn" 
-                title="Configurações"
-              >
-                ⚙️
-              </button>
-              <button 
-                onClick={() => { setModalAmigosAberto(true); setAbaAmigos('add'); setAmigoMensagem(""); }} 
-                className="icon-action-btn" 
-                title="Amigos"
-              >
-                👥
-              </button>
+              <button onClick={() => { setModalPerfilAberto(true); setAbaConfig('perfil'); }} className="icon-action-btn" title="Configurações">⚙️</button>
+              <button onClick={() => { setModalAmigosAberto(true); setAbaAmigos('add'); setAmigoMensagem(""); }} className="icon-action-btn" title="Amigos">👥</button>
             </div>
           </div>
         </div>
 
-        {/* LISTA DE CHATS ESTILIZADA */}
         <div className="chat-list">
-          {/* 🔴 NOVO: Limpa a notificação ao clicar na Lagoa */}
           <div className={`chat-item ${isLagoa ? "active" : ""}`} onClick={() => { setAbaAtiva("lagoa"); setMenuAberto(false); setLagoaNaoLida(false); }}>
             <div className="chat-item-avatar">🌊</div>
             <div className="chat-item-info">
@@ -857,14 +895,13 @@ export default function ChatPage() {
           </div>
 
           {privados.map((chat, i) => (
-            /* 🔴 NOVO: Limpa a notificação ao clicar em um Ninho Privado */
             <div key={chat.id} className={`chat-item ${abaAtiva === chat.id ? "active" : ""}`} onClick={() => { setAbaAtiva(chat.id); setMenuAberto(false); setPrivados(prev => prev.map(p => p.id === chat.id ? { ...p, naoLida: false } : p)); }}>
-              <div className="chat-item-avatar">🔒</div>
+              {/* 🦆 NOVO: Renderiza o ícone customizado ou o cadeado */}
+              <div className="chat-item-avatar">{chat.icone || "🔒"}</div>
               <div className="chat-item-info">
                 <span className="chat-item-title">{chat.nomeCustom || `Ninho Privado ${i + 1}`}</span>
                 <span className="chat-item-sub">Bate-Papo Seguro</span>
               </div>
-              {/* 🔴 NOVO: Renderiza a bolinha vermelha se a propriedade naoLida for true */}
               {chat.naoLida && <div className="unread-dot"></div>}
             </div>
           ))}
@@ -876,25 +913,50 @@ export default function ChatPage() {
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <button className="hamburger-btn" onClick={() => setMenuAberto(true)}>☰</button>
             
+            {/* 🦆 NOVO: Editor do Chat com Troca de Ícone e Deletar */}
             {editandoNome === abaAtiva && !isLagoa ? (
-              <input 
-                value={nomePrivadoInput} 
-                onChange={(e) => setNomePrivadoInput(e.target.value)}
-                onBlur={() => {
-                   setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
-                   setEditandoNome(null);
-                }}
-                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-                autoFocus
-                style={{ background: '#121e24', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '4px', padding: '6px 10px', outline: 'none', fontSize: '16px', fontWeight: 'bold' }}
-              />
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <select 
+                  value={privados.find(p => p.id === abaAtiva)?.icone || "🔒"}
+                  onChange={(e) => setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, icone: e.target.value } : p))}
+                  style={{ background: '#121e24', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '6px', padding: '8px', outline: 'none', fontSize: '18px', cursor: 'pointer' }}
+                >
+                  {["🔒", "🦆", "❤️", "🔥", "🚀", "🎮", "🎵", "⭐", "💼", "🍻", "😎", "👾", "🤖", "🍕"].map(emoji => (
+                    <option key={emoji} value={emoji}>{emoji}</option>
+                  ))}
+                </select>
+                <input 
+                  value={nomePrivadoInput} 
+                  onChange={(e) => setNomePrivadoInput(e.target.value)}
+                  onKeyDown={(e) => { 
+                    if (e.key === 'Enter') {
+                      setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
+                      setEditandoNome(null);
+                    }
+                  }}
+                  autoFocus
+                  style={{ background: '#121e24', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '6px', padding: '8px 10px', outline: 'none', fontSize: '16px', fontWeight: 'bold', maxWidth: '140px' }}
+                />
+                <button onClick={() => {
+                  setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
+                  setEditandoNome(null);
+                }} style={{background: '#2dd4bf', color: '#000', padding: '8px 12px', borderRadius: '6px', fontWeight: 'bold', border: 'none', cursor: 'pointer'}}>OK</button>
+                
+                <button onClick={() => {
+                  if(confirm("Tem certeza que deseja apagar e sair deste chat?")) {
+                    setPrivados(prev => prev.filter(p => p.id !== abaAtiva));
+                    setAbaAtiva("lagoa");
+                    setEditandoNome(null);
+                  }
+                }} style={{background: '#f43f5e', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontWeight: 'bold', border: 'none', cursor: 'pointer', marginLeft: '6px'}} title="Apagar Chat Definitivamente">🗑️</button>
+              </div>
             ) : (
               <span 
                 onClick={() => { if(!isLagoa) { setEditandoNome(abaAtiva); setNomePrivadoInput(privados.find(p => p.id === abaAtiva)?.nomeCustom || `Ninho Privado`); } }} 
                 style={{ cursor: isLagoa ? 'default' : 'pointer', fontSize: "18px", fontWeight: "900", color: "#fff", display: 'flex', alignItems: 'center', letterSpacing: '0.5px' }}
               >
-                {isLagoa ? "Mergulho Anônimo" : (privados.find(p => p.id === abaAtiva)?.nomeCustom || "Ninho Privado")}
-                {!isLagoa && <span style={{fontSize: '14px', marginLeft: '8px', opacity: 0.5}}>✏️</span>}
+                {isLagoa ? "Mergulho Anônimo" : `${privados.find(p => p.id === abaAtiva)?.icone || "🔒"} ${privados.find(p => p.id === abaAtiva)?.nomeCustom || "Ninho Privado"}`}
+                {!isLagoa && <span style={{fontSize: '14px', marginLeft: '8px', opacity: 0.5}} title="Editar Chat">✏️</span>}
               </span>
             )}
           </div>
@@ -1107,7 +1169,7 @@ export default function ChatPage() {
         </div>
       </main>
 
-      {/* MODAL DE PERFIL TURBINADO COM NOTIFICAÇÕES */}
+      {/* MODAL DE PERFIL TURBINADO COM NOTIFICAÇÕES E CONTROLE DE GANHO */}
       {modalPerfilAberto && (
         <div onClick={fecharModalPerfil} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '400px', maxHeight: '90vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
@@ -1160,17 +1222,25 @@ export default function ChatPage() {
                 </div>
               )}
 
+              {/* 🦆 NOVO: Controle Duplo de Áudio */}
               {abaConfig === 'audio' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <label className="pro-label">VOLUME DE SAÍDA</label>
+                    <label className="pro-label">VOLUME DE SAÍDA (ALTO-FALANTE)</label>
                     <span style={{ fontSize: '12px', color: '#2dd4bf', fontWeight: 'bold' }}>{volumeSaida}%</span>
                   </div>
                   <input type="range" min="0" max="100" value={volumeSaida} onChange={(e) => setVolumeSaida(Number(e.target.value))} className="discord-slider" />
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+                    <label className="pro-label">GANHO DO MICROFONE (ENTRADA)</label>
+                    <span style={{ fontSize: '12px', color: '#f43f5e', fontWeight: 'bold' }}>{ganhoMicrofone}%</span>
+                  </div>
+                  <input type="range" min="0" max="200" value={ganhoMicrofone} onChange={(e) => setGanhoMicrofone(Number(e.target.value))} className="discord-slider" />
+
                   <button type="button" onClick={alternarTesteMic} className={`btn-test-mic ${testandoMic ? 'active' : ''}`} style={{ marginTop: '10px' }}>
                     {testandoMic ? '🛑 Parar Teste' : '🎙️ Ouvir meu microfone'}
                   </button>
-                  <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5', marginTop: '8px' }}>Use o botão acima para falar e ouvir a sua própria voz para testar a qualidade do seu microfone e do seu alto-falante.</p>
+                  <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5', marginTop: '8px' }}>Use o botão acima para testar o ganho do seu microfone e a altura do seu alto-falante simultaneamente.</p>
                 </div>
               )}
 
