@@ -808,7 +808,7 @@ export default function ChatPage() {
         .app-layout { 
           display: flex; width: 100vw; height: 100vh; overflow: hidden; 
           font-family: 'Inter', sans-serif; color: #fff;
-          background-color: #020617; /* Fundo hiper escuro elegante */
+          background-color: #020617; 
           background-image: 
             radial-gradient(circle at 10% 20%, rgba(45, 212, 191, 0.08) 0%, transparent 40%),
             radial-gradient(circle at 90% 80%, rgba(14, 165, 233, 0.08) 0%, transparent 40%);
@@ -943,7 +943,7 @@ export default function ChatPage() {
         @keyframes pulse-neon { 0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(45, 212, 191, 0); } 100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0); } }
         .d-call-text { display: flex; flex-direction: column; }
         .d-call-title { color: #2dd4bf; font-weight: 800; font-size: 14px; letter-spacing: 0.5px; }
-        .d-call-subtitle { color: #94a3b8; font-size: 12px; font-weight: 500; }
+        .d-call-subtitle { color: #949ba4; font-size: 12px; font-weight: 500; }
         .d-call-actions { display: flex; gap: 10px; }
         .d-action-btn { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid transparent; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: 0.2s; }
         .d-action-btn:hover { background: rgba(255,255,255,0.1); }
@@ -1155,10 +1155,444 @@ export default function ChatPage() {
               </div>
             </div>
           )}
+
+          <div className="chat-messages">
+            {isLagoa && lagoaAtiva && tempoRestante !== null && (
+              <div style={{ backgroundColor: tempoRestante <= 60 ? 'rgba(244, 63, 94, 0.1)' : 'rgba(45, 212, 191, 0.05)', border: `1px dashed ${tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf'}`, color: tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf', padding: '12px', textAlign: 'center', fontSize: '12px', fontWeight: '800', borderRadius: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                {tempoRestante <= 60 ? "⚠️ " : "⏳ "} A Lagoa fechará em {Math.floor(tempoRestante / 60)}:{(tempoRestante % 60).toString().padStart(2, '0')}
+              </div>
+            )}
+
+            {isLagoa && !lagoaAtiva && !lagoaPendente && !procurando && (
+              <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.05)', maxWidth: '450px', backdropFilter: 'blur(20px)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+                <div className="duck-avatar" style={{ fontSize: '80px', marginBottom: '20px', filter: 'drop-shadow(0 0 20px rgba(45,212,191,0.5))' }}>🎭</div>
+                <h2 style={{ fontSize: "28px", fontWeight: "900", color: "#fff", marginBottom: "12px", letterSpacing: '1px' }}>Lagoa Secreta</h2>
+                <p style={{ color: "#94a3b8", fontSize: "15px", marginBottom: "32px", lineHeight: '1.6' }}>Mergulhe anonimamente. Você tem 6 minutos para conhecer alguém antes que a lagoa feche.</p>
+                
+                <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                  <label className="pro-label" style={{ display: 'block', marginBottom: '12px' }}>COM QUEM VOCÊ QUER CONVERSAR?</label>
+                  
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                    <button type="button" onClick={() => togglePreferencia('qualquer')} className={`pref-btn ${preferenciasGenero.includes('qualquer') ? 'active' : ''}`}>Qualquer</button>
+                    <button type="button" onClick={() => togglePreferencia('masculino')} className={`pref-btn ${preferenciasGenero.includes('masculino') ? 'active' : ''}`}>Masculinos</button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" onClick={() => togglePreferencia('feminino')} className={`pref-btn ${preferenciasGenero.includes('feminino') ? 'active' : ''}`}>Femininos</button>
+                    <button type="button" onClick={() => togglePreferencia('nao-binario')} className={`pref-btn ${preferenciasGenero.includes('nao-binario') ? 'active' : ''}`}>Não-Binários</button>
+                  </div>
+                </div>
+
+                <button onClick={procurarPato} style={{ width: '100%', padding: '16px 32px', fontSize: '16px', fontWeight: '900', background: 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', color: '#020617', border: 'none', borderRadius: '14px', cursor: 'pointer', boxShadow: '0 4px 20px rgba(45,212,191,0.4)', transition: '0.2s', textTransform: 'uppercase', letterSpacing: '1px' }}>ENTRAR NA ÁGUA 🚀</button>
+              </div>
+            )}
+
+            {isLagoa && procurando && (
+              <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid #2dd4bf', borderRadius: '24px', maxWidth: '400px', boxShadow: '0 0 40px rgba(45,212,191,0.15)', backdropFilter: 'blur(20px)' }}>
+                <div className="radar-spinner" style={{ margin: '0 auto 30px', width: '70px', height: '70px', border: '4px solid rgba(45, 212, 191, 0.1)', borderTopColor: '#2dd4bf', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                <h2 style={{ color: "#2dd4bf", fontSize: '22px', marginBottom: '12px', letterSpacing: '1px', fontWeight: '900' }}>Rastreando...</h2>
+                <p style={{ color: '#94a3b8', fontSize: '15px', marginBottom: '32px' }}>Buscando um pato compatível nas redondezas.</p>
+                
+                <button onClick={cancelarBusca} style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.5)', color: '#f43f5e', padding: '12px 32px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}>
+                  Cancelar Busca
+                </button>
+              </div>
+            )}
+
+            {isLagoa && lagoaPendente && !lagoaAtiva && (
+              <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid #2dd4bf', borderRadius: '24px', backdropFilter: 'blur(20px)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+                <h2 style={{ color: "#fff", marginBottom: "16px", fontSize: '26px', fontWeight: '900' }}>Alvo Encontrado!</h2>
+                <div style={{ display: "inline-block", background: "rgba(45,212,191,0.15)", color: "#2dd4bf", padding: "8px 20px", borderRadius: "20px", fontSize: "14px", fontWeight: "900", marginBottom: "24px", border: '1px solid rgba(45,212,191,0.3)' }}>
+                  Aguardando aceitação: {confirmados}/2
+                </div>
+                <p style={{ color: "#e2e8f0", marginBottom: "32px", fontSize: '16px' }}>Deseja conversar com <strong>{parceiroNomeAnon || "um Pato Misterioso"}</strong>?</p>
+                
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <button onClick={recusarConexao} style={{ flex: 1, padding: '14px', background: 'rgba(244,63,94,0.1)', color: '#f43f5e', border: '1px solid rgba(244,63,94,0.5)', borderRadius: '12px', fontWeight: '900', cursor: 'pointer', transition: '0.2s' }}>Pular ❌</button>
+                  <button onClick={aceitarConexao} style={{ flex: 2, padding: '14px', background: jaAceitou ? '#10b981' : 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', color: '#020617', fontWeight: '900', border: 'none', borderRadius: '12px', cursor: jaAceitou ? 'default' : 'pointer', boxShadow: '0 4px 15px rgba(45,212,191,0.3)', transition: '0.2s' }} disabled={jaAceitou}>
+                    {jaAceitou ? "⏳ Aguardando..." : "Conectar! 🚀"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(isLagoa ? lagoaAtiva : true) && (
+              <>
+                {statusConvite && (
+                  <div style={{ background: "rgba(15, 23, 42, 0.8)", border: "1px solid #2dd4bf", color: "#fff", padding: "12px 20px", textAlign: "center", borderRadius: "12px", margin: "0 auto 20px", display: (!isLagoa && statusConvite.includes("Chamando")) ? "flex" : "block", justifyContent: "space-between", alignItems: "center", maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{statusConvite}</span>
+                    {!isLagoa && statusConvite.includes("Chamando") && (
+                       <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", boxShadow: '0 2px 8px rgba(244,63,94,0.4)' }}>Cancelar</button>
+                    )}
+                  </div>
+                )}
+
+                {isLagoa && convitePendente && (
+                  <div style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05))", border: "1px solid #10b981", padding: "20px", textAlign: "center", borderRadius: "20px", margin: "0 auto 20px", maxWidth: '400px', backdropFilter: 'blur(10px)', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+                    <div style={{ fontSize: '30px', marginBottom: '10px' }}>🔐</div>
+                    <p style={{ color: "#fff", fontWeight: "900", marginBottom: "20px", fontSize: '16px' }}>{convitePendente} quer te levar pro Privado!</p>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <button onClick={() => responderConvite(false)} style={{ flex: 1, padding: '12px', background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.5)', color: '#f43f5e', fontWeight: 'bold', borderRadius: '10px', cursor: 'pointer' }}>Recusar</button>
+                      <button onClick={() => responderConvite(true)} style={{ flex: 1, padding: '12px', background: '#10b981', border: 'none', color: '#020617', fontWeight: '900', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(16,185,129,0.3)' }}>Aceitar</button>
+                    </div>
+                  </div>
+                )}
+
+                {msgsAtuais.map((msg) => {
+                  let nomeLimpo = msg.usuario;
+                  if (nomeLimpo.includes("data:image")) {
+                    const match = nomeLimpo.match(/([a-zA-Z0-9_ -]+#\d{4})/);
+                    if (match) nomeLimpo = match[1];
+                    else nomeLimpo = nomeLimpo.split(" ").pop() || "Pato";
+                  }
+                  nomeLimpo = nomeLimpo.replace(/^[^\w\s]+/, '').trim();
+
+                  const eSistema = nomeLimpo.includes("SISTEMA");
+                  const eMinha = !eSistema && nomeLimpo.includes(`#${minhaTag}`);
+
+                  let avatarMsg = "🦆";
+                  if (isLagoa) {
+                    avatarMsg = eSistema ? "🤖" : "🎭";
+                  } else {
+                    if (eSistema) avatarMsg = "🤖";
+                    else if (eMinha) avatarMsg = meuAvatar;
+                    else avatarMsg = chatAtivoData?.amigoRef?.avatar || chatAtivoData?.icone || "🦆"; 
+                  }
+
+                  return (
+                    <div key={msg.id} className={`message-wrapper ${eMinha && !eSistema ? 'is-mine' : eSistema ? 'is-system' : 'is-other'}`}>
+                      {!eMinha && !eSistema && (
+                        <div className="message-avatar" onClick={() => { if(!isLagoa && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
+                          {avatarMsg.startsWith("data:image/") ? <img src={avatarMsg} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover'}}/> : avatarMsg}
+                        </div>
+                      )}
+                      
+                      <div className="message-content">
+                        {!eSistema && (
+                          <span className="message-sender" onClick={() => { if(!eMinha && !isLagoa && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
+                            {nomeLimpo}
+                          </span>
+                        )}
+
+                        <div className="message-bubble">
+                          {msg.mensagem}
+                          {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "300px", borderRadius: "12px", marginTop: "8px", display: 'block', border: '1px solid rgba(255,255,255,0.1)' }} />}
+                          {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%", height: '36px', display: 'block', borderRadius: '18px' }} />}
+                        </div>
+                        
+                        <div className="message-time">
+                          {msg.hora}
+                          {eMinha && !eSistema && <span className="delete-msg" onClick={() => apagarMensagem(msg.id)}>Excluir</span>}
+                        </div>
+                      </div>
+
+                      {eMinha && !eSistema && (
+                        <div className="message-avatar">
+                          {avatarMsg.startsWith("data:image/") ? <img src={avatarMsg} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover'}}/> : avatarMsg}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+            </>
+          )}
         </div>
+
+        {(isLagoa ? lagoaAtiva : true) && (
+          <div className="chat-input-container">
+            {imagemBase64 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '12px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <img src={imagemBase64} alt="Preview" style={{ height: '50px', borderRadius: '8px', objectFit: 'cover' }} />
+                <span style={{ fontSize: '13px', color: '#94a3b8', flex: 1 }}>Imagem anexada</span>
+                <button onClick={() => setImagemBase64(null)} style={{ background: "rgba(244,63,94,0.2)", border: "none", color: "#f43f5e", cursor: "pointer", fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px' }}>Remover</button>
+              </div>
+            )}
+            
+            <form onSubmit={enviarMensagem} className="chat-input-wrapper">
+              {!isLagoa && (
+                <label className="btn-anexo" title="Anexar Imagem">
+                  📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
+                </label>
+              )}
+              
+              <input 
+                type="text" 
+                placeholder={gravandoAudioMsg ? "Gravando áudio... Fale agora!" : "Escreva uma mensagem..."} 
+                value={texto} 
+                onChange={(e) => setTexto(e.target.value)} 
+                disabled={gravandoAudioMsg} 
+                className="chat-input-field" 
+              />
+              
+              <button type="button" onClick={alternarGravacaoAudioMsg} className="btn-anexo" style={{ color: gravandoAudioMsg ? '#f43f5e' : '#94a3b8', background: gravandoAudioMsg ? 'rgba(244,63,94,0.1)' : 'transparent' }}>
+                {gravandoAudioMsg ? "🛑" : "🎙️"}
+              </button>
+              
+              <button type="submit" className="btn-enviar">➤</button>
+            </form>
+          </div>
+        )}
       </main>
+
+      {/* MODAL DE PERFIL DO AMIGO */}
+      {perfilAmigoSelecionado && (
+        <div onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(10px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '24px', width: '100%', maxWidth: '360px', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 30px 60px rgba(0,0,0,0.8)' }}>
+            <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, #0b141a 100%)', position: 'relative' }}>
+              <button onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'absolute', top: '16px', right: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '32px', height: '32px', color: '#94a3b8', fontSize: '16px', cursor: 'pointer', transition: '0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✖</button>
+              
+              <div style={{ width: '110px', height: '110px', borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '50px', border: '4px solid #2dd4bf', overflow: 'hidden', boxShadow: '0 0 20px rgba(45,212,191,0.3)' }}>
+                {perfilAmigoSelecionado.avatar && perfilAmigoSelecionado.avatar.startsWith("data:image/") ? (
+                  <img src={perfilAmigoSelecionado.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  perfilAmigoSelecionado.avatar || "🦆"
+                )}
+              </div>
+              
+              <div style={{ textAlign: 'center' }}>
+                <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '900', color: '#fff', letterSpacing: '0.5px' }}>{perfilAmigoSelecionado.name}</h2>
+                <span style={{ fontSize: '15px', color: '#2dd4bf', fontFamily: 'monospace', fontWeight: 'bold' }}>#{perfilAmigoSelecionado.tag}</span>
+              </div>
+
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', width: '100%', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', marginTop: '8px' }}>
+                <p style={{ margin: 0, color: '#e2e8f0', fontSize: '14px', fontStyle: 'italic', lineHeight: '1.5' }}>"{perfilAmigoSelecionado.bio || 'Mergulhando no lago...'}"</p>
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '1px' }}>
+                  IDENTIDADE: <span style={{ color: '#fff', marginLeft: '6px' }}>{perfilAmigoSelecionado.gender || 'Secreta'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIGURAÇÕES (CORRIGIDO OS DOIS PONTOS `:`) */}
+      {modalPerfilAberto && (
+        <div onClick={fecharModalPerfil} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '400px', maxHeight: '90vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid #1f2d35', background: '#0b141a' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px' }}>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>⚙️ Configurações</h3>
+                <button onClick={fecharModalPerfil} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>✖</button>
+              </div>
+              <div style={{ display: 'flex' }}>
+                <button onClick={() => setAbaConfig('perfil')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'perfil' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'perfil' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>👤 Perfil</button>
+                <button onClick={() => setAbaConfig('audio')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'audio' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'audio' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>🎙️ Áudio</button>
+                <button onClick={() => setAbaConfig('notificacoes')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'notificacoes' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'notificacoes' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>🔔 Alertas</button>
+              </div>
+            </div>
+            
+            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {abaConfig === 'perfil' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">NOME DE EXIBIÇÃO</label>
+                    <input type="text" value={meuNomeReal} onChange={(e) => setMeuNomeReal(e.target.value)} className="pro-input" />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">TAG DO USUÁRIO</label>
+                    <input type="text" value={`#${minhaTag}`} disabled className="pro-input" style={{ opacity: 0.6, cursor: 'not-allowed' }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">GÊNERO / IDENTIDADE</label>
+                    <select value={meuGenero} onChange={(e) => setMeuGenero(e.target.value)} className="pro-input" style={{ cursor: 'pointer' }}>
+                      <option value="prefiro-nao-dizer">Prefiro não dizer</option>
+                      <option value="masculino">Masculino</option>
+                      <option value="feminino">Feminino</option>
+                      <option value="nao-binario">Não-Binário</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">STATUS/BIO</label>
+                    <input type="text" value={meuStatusBio} onChange={(e) => setMeuStatusBio(e.target.value)} maxLength={50} className="pro-input" />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">AVATAR DO PERFIL</label>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {["🦆", "🦅", "🦉", "🐧", "👑", "🚀"].map((emoji) => (
+                        <span key={emoji} onClick={() => setMeuAvatar(emoji)} className={`avatar-btn ${meuAvatar === emoji ? 'active' : ''}`}>{emoji}</span>
+                      ))}
+
+                      <label style={{ cursor: 'pointer', padding: '10px 14px', borderRadius: '14px', background: meuAvatar.startsWith("data:image/") ? 'rgba(45, 212, 191, 0.15)' : '#121e24', border: meuAvatar.startsWith("data:image/") ? '1px solid #2dd4bf' : '1px solid #1f2d35', color: '#2dd4bf', fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        📷 Foto da Galeria
+                        <input type="file" accept="image/*" onChange={handleUploadMeuAvatar} style={{ display: 'none' }} />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {abaConfig === 'audio' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <label className="pro-label">VOLUME DE SAÍDA (ALTO-FALANTE)</label>
+                    <span style={{ fontSize: '12px', color: '#2dd4bf', fontWeight: 'bold' }}>{volumeSaida}%</span>
+                  </div>
+                  <input type="range" min="0" max="100" value={volumeSaida} onChange={(e) => setVolumeSaida(Number(e.target.value))} className="discord-slider" />
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+                    <label className="pro-label">GANHO DO MICROFONE (ENTRADA)</label>
+                    <span style={{ fontSize: '12px', color: '#f43f5e', fontWeight: 'bold' }}>{ganhoMicrofone}%</span>
+                  </div>
+                  <input type="range" min="0" max="200" value={ganhoMicrofone} onChange={(e) => setGanhoMicrofone(Number(e.target.value))} className="discord-slider" />
+
+                  <button type="button" onClick={alternarTesteMic} className={`btn-test-mic ${testandoMic ? 'active' : ''}`} style={{ marginTop: '10px' }}>
+                    {testandoMic ? '🛑 Parar Teste' : '🎙️ Ouvir meu microfone'}
+                  </button>
+                  <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5', marginTop: '8px' }}>Use o botão acima para testar o ganho do seu microfone e a altura do seu alto-falante simultaneamente.</p>
+                </div>
+              )}
+
+              {abaConfig === 'notificacoes' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1, paddingRight: '16px' }}>
+                      <label className="pro-label" style={{ display: 'block', marginBottom: '4px' }}>NOTIFICAÇÕES DE ÁREA DE TRABALHO</label>
+                      <span style={{ fontSize: '13px', color: '#94a3b8', lineHeight: '1.4', display: 'block' }}>
+                        Receba um alerta na tela do seu dispositivo quando receber mensagens, convites ou ligações enquanto não estiver com a aba do chat aberta.
+                      </span>
+                    </div>
+                    
+                    <button 
+                      onClick={handleToggleNotificacoes}
+                      style={{
+                        width: '52px', height: '28px', borderRadius: '14px', border: 'none',
+                        background: permiteNotificacoes ? '#10b981' : '#1f2d35',
+                        position: 'relative', cursor: 'pointer', transition: 'background 0.3s',
+                        flexShrink: 0
+                      }}
+                    >
+                      <div style={{
+                        width: '22px', height: '22px', borderRadius: '50%', background: '#fff',
+                        position: 'absolute', top: '3px', left: permiteNotificacoes ? '27px' : '3px',
+                        transition: 'left 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }} />
+                    </button>
+                  </div>
+                  
+                  {permiteNotificacoes && (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', padding: '12px', borderRadius: '8px', color: '#10b981', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
+                      ✅ O DuckZone está autorizado a enviar notificações.
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+            <div style={{ padding: '20px 24px', borderTop: '1px solid #1f2d35', background: '#080e12' }}>
+              <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', border: 'none', borderRadius: '12px', color: '#020d12', fontWeight: '900', cursor: 'pointer', fontSize: '15px' }}>
+                SALVAR E FECHAR 💾
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE AMIGOS */}
+      {modalAmigosAberto && (
+        <div onClick={() => setModalAmigosAberto(false)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '450px', minHeight: '400px', maxHeight: '80vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid #1f2d35', background: '#0b141a' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px' }}>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>🦆 Amigos</h3>
+                <button onClick={() => setModalAmigosAberto(false)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '24px', cursor: 'pointer' }}>✖</button>
+              </div>
+              <div style={{ display: 'flex' }}>
+                <button onClick={() => setAbaAmigos('add')} style={{ flex: 1, padding: '12px', background: 'transparent', border: 'none', color: abaAmigos === 'add' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaAmigos === 'add' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>Adicionar</button>
+                <button onClick={() => setAbaAmigos('pending')} style={{ flex: 1, padding: '12px', background: 'transparent', border: 'none', color: abaAmigos === 'pending' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaAmigos === 'pending' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  Pendentes {listaPendentes.length > 0 && <span style={{ background: '#f43f5e', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', color: '#fff' }}>{listaPendentes.length}</span>}
+                </button>
+                <button onClick={() => setAbaAmigos('list')} style={{ flex: 1, padding: '12px', background: 'transparent', border: 'none', color: abaAmigos === 'list' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaAmigos === 'list' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>Meus Amigos</button>
+              </div>
+            </div>
+            
+            <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+              {abaAmigos === 'add' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>Digite a Tag do pato. Ex: <strong>Pato#0000</strong></p>
+                  <form onSubmit={enviarConviteAmizade} style={{ display: 'flex', gap: '8px' }}>
+                    <input type="text" placeholder="Nome#Tag" value={amigoTagInput} onChange={(e) => setAmigoTagInput(e.target.value)} className="pro-input" required style={{ flex: 1 }} />
+                    <button type="submit" style={{ padding: '0 20px', background: 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', color: '#020d12' }}>Enviar</button>
+                  </form>
+                  {amigoMensagem && <div style={{ color: amigoMensagem.includes('✅') ? '#10b981' : '#f43f5e', fontSize: '14px', fontWeight: 'bold', textAlign: 'center', background: amigoMensagem.includes('✅') ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)', padding: '12px', borderRadius: '8px' }}>{amigoMensagem}</div>}
+                </div>
+              )}
+
+              {abaAmigos === 'pending' && (
+                <div>
+                  {listaPendentes.length === 0 ? (
+                    <p style={{ color: '#64748b', textAlign: 'center', marginTop: '40px' }}>Nenhum convite pendente. 🦗</p>
+                  ) : (
+                    listaPendentes.map((req) => (
+                      <div key={req.id} className="friend-card" style={{ cursor: 'default' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div className="friend-avatar-wrap">
+                            {req.sender.avatar && req.sender.avatar.startsWith("data:image/") ? (
+                              <img src={req.sender.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              req.sender.avatar || "🦆"
+                            )}
+                          </div>
+                          <div className="friend-info">
+                            <div className="friend-name">{req.sender.name}</div>
+                            <div style={{ marginTop: '4px' }}>
+                              <span className="friend-tag">#{req.sender.tag}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="btn-accept" onClick={() => responderConviteAmizade(req.id, 'ACCEPT')}>✓</button>
+                          <button className="btn-reject" onClick={() => responderConviteAmizade(req.id, 'REJECT')}>✕</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {abaAmigos === 'list' && (
+                <div>
+                  {listaAmigosAceitos.length === 0 ? (
+                    <p style={{ color: '#64748b', textAlign: 'center', marginTop: '40px' }}>Você ainda não tem amigos na lagoa. 🦆😢</p>
+                  ) : (
+                    listaAmigosAceitos.map((amizade) => {
+                      const amigo = amizade.senderId === meuIdBanco ? amizade.receiver : amizade.sender;
+                      return (
+                        <div key={amizade.id} className="friend-card" onClick={() => iniciarChatComAmigo(amizade.id)}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <div className="friend-avatar-wrap">
+                              {amigo.avatar && amigo.avatar.startsWith("data:image/") ? (
+                                <img src={amigo.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                amigo.avatar || "🦆"
+                              )}
+                            </div>
+                            <div className="friend-info">
+                              <div className="friend-name">
+                                {amigo.name}
+                              </div>
+                              <div style={{ marginTop: '4px' }}>
+                                <span className="friend-tag">#{amigo.tag}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="chat-action-btn">
+                            💬
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-
