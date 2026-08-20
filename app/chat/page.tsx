@@ -803,6 +803,13 @@ export default function ChatPage() {
       <audio ref={testAudioRef} autoPlay playsInline muted={false} style={{ display: 'none' }} />
 
       <style dangerouslySetInnerHTML={{__html: `
+        /* 🦆 FIX DE SCROLLBARS MODERNO E LIMPO */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(45, 212, 191, 0.4); }
+        * { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.1) transparent; }
+
         .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: #020d12; color: #fff; font-family: sans-serif; }
         .sidebar { width: 340px; background: #0b141a; border-right: 1px solid #1f2d35; display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100; flex-shrink: 0; }
         .main-chat-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; background: #020d12; }
@@ -1179,9 +1186,21 @@ export default function ChatPage() {
 
               <div className="chat-messages" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
                 {msgsAtuais.map((msg) => {
-                  const meuNomeRealAqui = `${meuNomeReal}#${minhaTag}`;
-                  const eMinha = msg.usuario === (isLagoa ? meuNomeAnon : meuNomeRealAqui);
-                  const eSistema = msg.usuario.includes("SISTEMA");
+                  // 1. Limpa o nome caso ele tenha ficado gigante com código de imagem antigo
+                  let nomeLimpo = msg.usuario;
+                  if (nomeLimpo.includes("data:image")) {
+                    const match = nomeLimpo.match(/([a-zA-Z0-9_ -]+#\d{4})/);
+                    if (match) nomeLimpo = match[1];
+                    else nomeLimpo = nomeLimpo.split(" ").pop() || "Pato";
+                  }
+                  nomeLimpo = nomeLimpo.replace(/^[^\w\s]+/, '').trim();
+
+                  const eSistema = nomeLimpo.includes("SISTEMA");
+                  
+                  // 2. Identificação blindada: compara usando a TAG do usuário logado
+                  const eMinha = !eSistema && (
+                    isLagoa ? msg.usuario === meuNomeAnon : (nomeLimpo.includes(`#${minhaTag}`) || nomeLimpo.includes(meuNomeReal))
+                  );
 
                   let avatarMsg = "🦆";
                   if (isLagoa) {
@@ -1193,7 +1212,18 @@ export default function ChatPage() {
                   }
 
                   return (
-                    <div key={msg.id} style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-start' }}>
+                    <div 
+                      key={msg.id} 
+                      style={{ 
+                        display: 'flex', 
+                        gap: '12px', 
+                        marginBottom: '12px', 
+                        alignItems: 'flex-start',
+                        flexDirection: eMinha && !eSistema ? 'row-reverse' : 'row',
+                        justifyContent: eMinha && !eSistema ? 'flex-start' : 'flex-start'
+                      }}
+                    >
+                      {/* Avatar */}
                       <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#1a2830', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0, overflow: 'hidden' }}>
                         {avatarMsg.startsWith("data:image/") ? (
                           <img src={avatarMsg} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1201,21 +1231,32 @@ export default function ChatPage() {
                           avatarMsg
                         )}
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                          <span style={{ fontWeight: 'bold', fontSize: '14px', color: eMinha ? '#2dd4bf' : '#fff' }}>{msg.usuario}</span>
-                          <span style={{ fontSize: '11px', color: '#64748b' }}>{msg.hora}</span>
-                          {eMinha && !eSistema && (
-                            <button onClick={() => apagarMensagem(msg.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', fontSize: '11px', cursor: 'pointer', marginLeft: 'auto' }}>
-                              🗑️
-                            </button>
-                          )}
+
+                      {/* Balão e Nome */}
+                      <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '75%', alignItems: eMinha && !eSistema ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '2px' }}>
+                          <span style={{ fontWeight: 'bold', fontSize: '13px', color: eMinha ? '#2dd4bf' : '#94a3b8' }}>{nomeLimpo}</span>
+                          <span style={{ fontSize: '10px', color: '#64748b' }}>{msg.hora}</span>
                         </div>
-                        <div style={{ color: '#e2e8f0', fontSize: '14px', marginTop: '4px' }}>
+                        
+                        <div style={{ 
+                          background: eMinha ? '#2dd4bf' : '#1e293b', 
+                          color: eMinha ? '#020d12' : '#e2e8f0', 
+                          padding: '10px 14px', 
+                          borderRadius: eMinha ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                          fontSize: '14px',
+                          wordBreak: 'break-word'
+                        }}>
                           {msg.mensagem}
-                          {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "300px", borderRadius: "8px", marginTop: "8px", display: 'block' }} />}
+                          {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "250px", borderRadius: "8px", marginTop: "8px", display: 'block' }} />}
                           {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%", height: '36px', display: 'block' }} />}
                         </div>
+
+                        {eMinha && !eSistema && (
+                          <button onClick={() => apagarMensagem(msg.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', fontSize: '11px', cursor: 'pointer', marginTop: '2px' }}>
+                            🗑️ apagar
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
