@@ -589,7 +589,7 @@ export default function ChatPage() {
     socket.on("webrtc_answer", async (data) => {
       if (peerConnectionRef.current) { 
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); 
-        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} });
+        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e){} });
         iceCandidatesQueue.current = [];
         setChamadaAtiva(true); 
       }
@@ -889,7 +889,7 @@ export default function ChatPage() {
         /* 💬 HEADER DO CHAT */
         .chat-header { display: flex; padding: 16px 24px; background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center; justify-content: space-between; z-index: 10; }
 
-        /* 💬 MENSAGENS (ESTILO WHATSAPP/TELEGRAM PREMIUM) */
+        /* 💬 MENSAGENS */
         .chat-messages { padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; flex: 1; }
         .message-wrapper { display: flex; gap: 12px; max-width: 80%; animation: slideUp 0.3s ease-out forwards; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -932,7 +932,7 @@ export default function ChatPage() {
         .btn-enviar { background: linear-gradient(135deg, #0ea5e9, #2dd4bf); color: #020617; border: none; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3); transition: transform 0.2s; }
         .btn-enviar:hover { transform: scale(1.05); }
 
-        /* CLASSES EXTRÍDAS DO INLINE PARA PREVENIR ERROS DE COMPILAÇÃO DO SWC */
+        /* CLASSES CSS DE ESTILO COMPACTAS */
         .status-convite-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #2dd4bf; color: #fff; padding: 12px 20px; text-align: center; border-radius: 12px; margin: 0 auto 20px; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
         .status-convite-box.is-chamando { display: flex; justify-content: space-between; align-items: center; }
         .convite-privado-box { background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05)); border: 1px solid #10b981; padding: 20px; text-align: center; border-radius: 20px; margin: 0 auto 20px; max-width: 400px; backdrop-filter: blur(10px); box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
@@ -952,7 +952,7 @@ export default function ChatPage() {
         @keyframes pulse-neon { 0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(45, 212, 191, 0); } 100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0); } }
         .d-call-text { display: flex; flex-direction: column; }
         .d-call-title { color: #2dd4bf; font-weight: 800; font-size: 14px; letter-spacing: 0.5px; }
-        .d-call-subtitle { color: #94a3b8; font-size: 12px; font-weight: 500; }
+        .d-call-subtitle { color: #949ba4; font-size: 12px; font-weight: 500; }
         .d-call-actions { display: flex; gap: 10px; }
         .d-action-btn { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid transparent; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: 0.2s; }
         .d-action-btn:hover { background: rgba(255,255,255,0.1); }
@@ -1173,7 +1173,7 @@ export default function ChatPage() {
             )}
 
             {isLagoa && !lagoaAtiva && !lagoaPendente && !procurando && (
-              <div className="matching-card" style={{ background: 'rgba(15, 23, 42, 0.6)' }}>
+              <div className="matching-card">
                 <div className="duck-avatar" style={{ fontSize: '80px', marginBottom: '20px', filter: 'drop-shadow(0 0 20px rgba(45,212,191,0.5))' }}>🎭</div>
                 <h2 style={{ fontSize: "28px", fontWeight: "900", color: "#fff", marginBottom: "12px", letterSpacing: '1px' }}>Lagoa Secreta</h2>
                 <p style={{ color: "#94a3b8", fontSize: "15px", marginBottom: "32px", lineHeight: '1.6' }}>Mergulhe anonimamente. Você tem 6 minutos para conhecer alguém antes que a lagoa feche.</p>
@@ -1492,7 +1492,7 @@ export default function ChatPage() {
 
             </div>
             <div style={{ padding: '20px 24px', borderTop: '1px solid #1f2d35', background: '#080e12' }}>
-              <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', border: 'none', borderRadius: '12px', color: '#020d12', fontWeight: '900', cursor: 'pointer', fontSize: '15px' }}>
+              <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', border: 'none', borderRadius: '12px', color: '#020617', fontWeight: '900', cursor: 'pointer', fontSize: '15px' }}>
                 SALVAR E FECHAR 💾
               </button>
             </div>
