@@ -906,7 +906,6 @@ export default function ChatPage() {
 
         <div className="profile-card-container">
           <div className="profile-card">
-            {/* 🖼️ RENDERIZA FOTO DA GALERIA OU EMOJI NO SEU PERFIL */}
             <div className="profile-card-avatar">
               {meuAvatar.startsWith("data:image/") ? (
                 <img src={meuAvatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover' }} />
@@ -939,7 +938,6 @@ export default function ChatPage() {
 
           {privados.map((chat, i) => (
             <div key={chat.id} className={`chat-item ${abaAtiva === chat.id ? "active" : ""}`} onClick={() => { setAbaAtiva(chat.id); setMenuAberto(false); setPrivados(prev => prev.map(p => p.id === chat.id ? { ...p, naoLida: false } : p)); }}>
-              {/* 🖼️ RENDERIZA FOTO DA GALERIA OU EMOJI NO ÍCONE DO CHAT PRIVADO */}
               <div className="chat-item-avatar">
                 {chat.icone && chat.icone.startsWith("data:image/") ? (
                   <img src={chat.icone} alt="Icone" style={{ width: '100%', height: '100%', borderRadius: '10px', objectFit: 'cover' }} />
@@ -974,7 +972,6 @@ export default function ChatPage() {
                   ))}
                 </select>
 
-                {/* 🖼️ BOTÃO DE SELECIONAR FOTO DA GALERIA PARA O CHAT */}
                 <label style={{ cursor: 'pointer', background: '#121e24', border: '1px solid #2dd4bf', color: '#2dd4bf', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   🖼️ Foto
                   <input type="file" accept="image/*" onChange={(e) => handleUploadIconeChat(e, abaAtiva)} style={{ display: 'none' }} />
@@ -1246,7 +1243,7 @@ export default function ChatPage() {
               <div style={{ display: 'flex' }}>
                 <button onClick={() => setAbaConfig('perfil')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'perfil' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'perfil' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>👤 Perfil</button>
                 <button onClick={() => setAbaConfig('audio')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'audio' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'audio' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>🎙️ Áudio</button>
-                <button onClick={() => setAbaConfig('notificacoes')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color abaConfig === 'notificacoes' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'notificacoes' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>🔔 Alertas</button>
+                <button onClick={() => setAbaConfig('notificacoes')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'notificacoes' ? '#2dd4bf' : '#94a3b8', fontWeight: 'bold', borderBottom: abaConfig === 'notificacoes' ? '2px solid #2dd4bf' : '2px solid transparent', cursor: 'pointer' }}>🔔 Alertas</button>
               </div>
             </div>
             
