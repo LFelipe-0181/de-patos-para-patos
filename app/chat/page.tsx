@@ -1155,3 +1155,10 @@ export default function ChatPage() {
               </div>
             </div>
           )}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+
