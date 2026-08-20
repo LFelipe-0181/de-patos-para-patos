@@ -19,7 +19,8 @@ interface ChatPrivado {
   nomeCustom?: string;
   mensagens: Mensagem[];
   naoLida?: boolean;
-  icone?: string; // Pode ser Emoji ou Imagem Base64 da galeria
+  icone?: string; 
+  amigoRef?: any; // Guarda os dados do amigo para o Modal de Perfil
 }
 
 export default function ChatPage() {
@@ -38,6 +39,7 @@ export default function ChatPage() {
   const permiteNotificacoesRef = useRef<boolean>(false);
   
   const [modalPerfilAberto, setModalPerfilAberto] = useState<boolean>(false);
+  const [perfilAmigoSelecionado, setPerfilAmigoSelecionado] = useState<any | null>(null); // MODAL DO AMIGO
   
   const [modalAmigosAberto, setModalAmigosAberto] = useState<boolean>(false);
   const [amigoTagInput, setAmigoTagInput] = useState<string>("");
@@ -175,15 +177,23 @@ export default function ChatPage() {
             amigos.forEach((amizade: any) => {
               const roomId = `ninho_friend_${amizade.id}`;
               const amigo = amizade.senderId === data.myId ? amizade.receiver : amizade.sender;
+              
+              const chatIndex = novosPrivados.findIndex(p => p.id === roomId);
 
-              if (!novosPrivados.some(p => p.id === roomId)) {
+              if (chatIndex === -1) {
                 novosPrivados.push({
                   id: roomId,
                   nomeCustom: amigo.name,
                   mensagens: [],
                   naoLida: false,
-                  icone: amigo.avatar && amigo.avatar.startsWith("data:image/") ? amigo.avatar : "🔒"
+                  icone: amigo.avatar || "🦆", // A FOTO DO AMIGO POR PADRÃO
+                  amigoRef: amigo // GUARDA OS DADOS DELE
                 });
+                mudou = true;
+              } else {
+                // Atualiza a foto do amigo e a referência
+                novosPrivados[chatIndex].amigoRef = amigo;
+                novosPrivados[chatIndex].icone = amigo.avatar || "🦆";
                 mudou = true;
               }
               socketRef.current?.emit("entrar_sala_privada", { novaSalaPrivada: roomId });
@@ -443,7 +453,9 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("duckzone_ninhos_privados", JSON.stringify(privados));
+      // Cria uma copia segura sem a string Base64 pra salvar no localStorage sem estourar memoria
+      const dadosLeves = privados.map(chat => ({ ...chat, amigoRef: null }));
+      localStorage.setItem("duckzone_ninhos_privados", JSON.stringify(dadosLeves));
     }
   }, [privados]);
   // ====== SOCKET E WEBRTC ======
@@ -754,7 +766,8 @@ export default function ChatPage() {
           const reader = new FileReader();
           reader.onloadend = () => {
             const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
-            if (salaAlvo) socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: abaAtiva !== "lagoa" ? `${meuAvatar} ${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: "🎤 Mensagem de áudio", audio: reader.result as string });
+            // 🐛 CORREÇÃO: ENVIA APENAS O NOME, SEM MISTURAR COM O AVATAR BASE64!
+            if (salaAlvo) socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: abaAtiva !== "lagoa" ? `${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: "🎤 Mensagem de áudio", audio: reader.result as string });
           };
           reader.readAsDataURL(audioBlob);
           stream.getTracks().forEach((track) => track.stop());
@@ -774,7 +787,8 @@ export default function ChatPage() {
     if (!texto.trim() && !imagemBase64) return;
     const isPrivado = abaAtiva !== "lagoa"; const salaAlvo = isPrivado ? abaAtiva : lagoaId;
     if (!salaAlvo) return;
-    socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: isPrivado ? `${meuAvatar} ${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: texto, imagem: isPrivado ? imagemBase64 : null });
+    // 🐛 CORREÇÃO: O AVATAR FOI RETIRADO DAQUI PARA NÃO VAZAR O CÓDIGO GIGANTE NO CHAT
+    socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: isPrivado ? `${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: texto, imagem: isPrivado ? imagemBase64 : null });
     setTexto(""); setImagemBase64(null);
   };
 
@@ -784,7 +798,8 @@ export default function ChatPage() {
   };
 
   const isLagoa = abaAtiva === "lagoa";
-  const msgsAtuais = isLagoa ? lagoaMensagens : privados.find(p => p.id === abaAtiva)?.mensagens || [];
+  const chatAtivoData = privados.find(p => p.id === abaAtiva);
+  const msgsAtuais = isLagoa ? lagoaMensagens : chatAtivoData?.mensagens || [];
 
   return (
     <div className="app-layout">
@@ -846,6 +861,28 @@ export default function ChatPage() {
           box-shadow: 0 0 6px rgba(244, 63, 94, 0.8);
           flex-shrink: 0;
         }
+
+        /* 💬 NOVO LAYOUT DO CHAT (ESTILO DISCORD) */
+        .discord-message {
+          display: flex; gap: 16px; margin-top: 4px; padding: 4px 16px; border-radius: 8px; transition: background 0.1s;
+        }
+        .discord-message:hover { background: rgba(255,255,255,0.03); }
+        .discord-message.is-mine { background: rgba(45, 212, 191, 0.05); }
+        .discord-message.is-mine:hover { background: rgba(45, 212, 191, 0.08); }
+        
+        .discord-avatar {
+          width: 44px; height: 44px; border-radius: 50%; background: #1a2830; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; overflow: hidden; cursor: pointer; transition: transform 0.2s;
+        }
+        .discord-avatar:hover { transform: scale(1.05); }
+
+        .discord-msg-content { display: flex; flex-direction: column; flex: 1; }
+        .discord-msg-header { display: flex; alignItems: baseline; gap: 8px; }
+        .discord-username { font-weight: 800; font-size: 15px; cursor: pointer; }
+        .discord-username:hover { text-decoration: underline; }
+        .discord-timestamp { font-size: 11px; color: #64748b; }
+        .discord-text { color: #e2e8f0; font-size: 15px; margin-top: 4px; line-height: 1.4; word-break: break-word; }
+        .discord-delete-btn { opacity: 0; cursor: pointer; font-size: 12px; color: #f43f5e; margin-left: auto; transition: opacity 0.2s; }
+        .discord-message:hover .discord-delete-btn { opacity: 1; }
 
         /* PAINEL DE LIGAÇÃO DISCORD */
         .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
@@ -963,7 +1000,7 @@ export default function ChatPage() {
             {editandoNome === abaAtiva && !isLagoa ? (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <select 
-                  value={privados.find(p => p.id === abaAtiva)?.icone?.startsWith("data:image/") ? "🔒" : privados.find(p => p.id === abaAtiva)?.icone || "🔒"}
+                  value={chatAtivoData?.icone?.startsWith("data:image/") ? "🔒" : chatAtivoData?.icone || "🔒"}
                   onChange={(e) => setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, icone: e.target.value } : p))}
                   style={{ background: '#121e24', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '6px', padding: '8px', outline: 'none', fontSize: '18px', cursor: 'pointer' }}
                 >
@@ -1004,20 +1041,23 @@ export default function ChatPage() {
               </div>
             ) : (
               <span 
-                onClick={() => { if(!isLagoa) { setEditandoNome(abaAtiva); setNomePrivadoInput(privados.find(p => p.id === abaAtiva)?.nomeCustom || `Ninho Privado`); } }} 
-                style={{ cursor: isLagoa ? 'default' : 'pointer', fontSize: "18px", fontWeight: "900", color: "#fff", display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.5px' }}
+                style={{ fontSize: "18px", fontWeight: "900", color: "#fff", display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.5px' }}
               >
                 {isLagoa ? "Mergulho Anônimo" : (
                   <>
-                    {privados.find(p => p.id === abaAtiva)?.icone?.startsWith("data:image/") ? (
-                      <img src={privados.find(p => p.id === abaAtiva)?.icone} alt="Icone Chat" style={{ width: '28px', height: '28px', borderRadius: '8px', objectFit: 'cover' }} />
-                    ) : (
-                      privados.find(p => p.id === abaAtiva)?.icone || "🔒"
-                    )}
-                    {privados.find(p => p.id === abaAtiva)?.nomeCustom || "Ninho Privado"}
+                    <span style={{ cursor: 'pointer' }} onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}>
+                      {chatAtivoData?.icone?.startsWith("data:image/") ? (
+                        <img src={chatAtivoData.icone} alt="Icone Chat" style={{ width: '28px', height: '28px', borderRadius: '8px', objectFit: 'cover' }} />
+                      ) : (
+                        chatAtivoData?.icone || "🔒"
+                      )}
+                    </span>
+                    <span style={{ cursor: 'pointer' }} onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}>
+                      {chatAtivoData?.nomeCustom || "Ninho Privado"}
+                    </span>
                   </>
                 )}
-                {!isLagoa && <span style={{fontSize: '14px', marginLeft: '4px', opacity: 0.5}} title="Editar Chat">✏️</span>}
+                {!isLagoa && <span onClick={() => { setEditandoNome(abaAtiva); setNomePrivadoInput(chatAtivoData?.nomeCustom || `Ninho Privado`); }} style={{fontSize: '14px', marginLeft: '4px', opacity: 0.5, cursor: 'pointer'}} title="Editar Chat">✏️</span>}
               </span>
             )}
           </div>
@@ -1154,50 +1194,46 @@ export default function ChatPage() {
 
           {(isLagoa ? lagoaAtiva : true) && (
             <>
-              {statusConvite && (
-                <div style={{ 
-                  background: "rgba(6,24,33,0.9)", border: "1px solid #2dd4bf", color: "#fff", 
-                  padding: "10px 16px", textAlign: "center", borderRadius: "10px", margin: "10px 16px",
-                  display: (!isLagoa && statusConvite.includes("Chamando")) ? "flex" : "block", 
-                  justifyContent: "space-between", alignItems: "center" 
-                }}>
-                  <span>{statusConvite}</span>
-                  {!isLagoa && statusConvite.includes("Chamando") && (
-                     <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>Cancelar ✖</button>
-                  )}
-                </div>
-              )}
-
-              {isLagoa && convitePendente && (
-                <div style={{ background: "rgba(16,185,129,0.15)", border: "1px solid #10b981", padding: "16px", textAlign: "center", borderRadius: "16px", margin: "10px 16px" }}>
-                  <p style={{ color: "#fff", fontWeight: "bold", marginBottom: "12px" }}>🔒 {convitePendente} te convidou para o Privado!</p>
-                  <button onClick={() => responderConvite(true)} style={{ padding: '10px 16px', background: '#10b981', border: 'none', color: '#000', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', marginRight: '10px' }}>Aceitar</button>
-                  <button onClick={() => responderConvite(false)} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid #f43f5e', color: '#f43f5e', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer' }}>Recusar</button>
-                </div>
-              )}
-
-              <div className="chat-messages" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="chat-messages" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
                 {msgsAtuais.map((msg) => {
-                  const meuNomeAqui = isLagoa ? meuNomeAnon : `${meuAvatar} ${meuNomeReal}#${minhaTag}`;
-                  const eMinha = msg.usuario === meuNomeAqui;
+                  const meuNomeRealAqui = `${meuNomeReal}#${minhaTag}`;
+                  const eMinha = msg.usuario === (isLagoa ? meuNomeAnon : meuNomeRealAqui);
                   const eSistema = msg.usuario.includes("SISTEMA");
 
+                  // Define a foto baseada no remetente sem passar Base64 pela rede
+                  let avatarMsg = "🦆";
+                  if (isLagoa) {
+                    avatarMsg = eSistema ? "🤖" : "🎭";
+                  } else {
+                    if (eSistema) avatarMsg = "🤖";
+                    else if (eMinha) avatarMsg = meuAvatar;
+                    else avatarMsg = chatAtivoData?.icone || "🦆"; // Foto oficial do amigo
+                  }
+
                   return (
-                    <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: eSistema ? 'center' : eMinha ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '4px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        {msg.usuario} • {msg.hora}
-                        {eMinha && !eSistema && <span onClick={() => apagarMensagem(msg.id)} style={{ cursor: 'pointer' }}>🗑️</span>}
+                    <div key={msg.id} className={`discord-message ${eMinha && !eSistema ? 'is-mine' : ''}`}>
+                      {/* Avatar no estilo Discord */}
+                      <div className="discord-avatar" onClick={() => { if(!eMinha && !isLagoa && !eSistema && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
+                        {avatarMsg.startsWith("data:image/") ? (
+                          <img src={avatarMsg} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover'}}/>
+                        ) : (
+                          avatarMsg
+                        )}
                       </div>
-                      <div style={{ 
-                        background: eSistema ? '#1e293b' : eMinha ? '#2dd4bf' : '#1e293b', 
-                        color: eSistema ? '#cbd5e1' : eMinha ? '#020d12' : '#fff',
-                        padding: '10px 14px', borderRadius: eMinha ? '14px 14px 2px 14px' : '14px 14px 14px 2px',
-                        maxWidth: '85%', fontSize: '15px', lineHeight: '1.4', wordBreak: 'break-word',
-                        border: eSistema ? '1px solid #334155' : 'none'
-                      }}>
-                        {msg.mensagem}
-                        {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "100%", borderRadius: "8px", marginTop: "8px" }} />}
-                        {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%", height: '36px' }} />}
+                      
+                      <div className="discord-msg-content">
+                        <div className="discord-msg-header">
+                          <span className="discord-username" style={{ color: eMinha ? '#2dd4bf' : '#f8fafc' }} onClick={() => { if(!eMinha && !isLagoa && !eSistema && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
+                            {msg.usuario}
+                          </span>
+                          <span className="discord-timestamp">{msg.hora}</span>
+                          {eMinha && !eSistema && <span className="discord-delete-btn" onClick={() => apagarMensagem(msg.id)}>🗑️ Excluir</span>}
+                        </div>
+                        <div className="discord-text">
+                          {msg.mensagem}
+                          {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "300px", borderRadius: "8px", marginTop: "8px", display: 'block' }} />}
+                          {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%", height: '36px', display: 'block' }} />}
+                        </div>
                       </div>
                     </div>
                   );
@@ -1205,7 +1241,7 @@ export default function ChatPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              <div style={{ padding: '16px', background: '#0b141a', borderTop: '1px solid #1f2d35' }}>
+              <div style={{ padding: '16px', background: '#0b141a', borderTop: '1px solid #1f2d35', marginTop: 'auto' }}>
                 {imagemBase64 && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#121e24', padding: '8px', borderRadius: '8px', marginBottom: '10px' }}>
                     <img src={imagemBase64} alt="Preview" style={{ height: '40px', borderRadius: '4px' }} />
@@ -1218,7 +1254,7 @@ export default function ChatPage() {
                       📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
                     </label>
                   )}
-                  <input type="text" placeholder={gravandoAudioMsg ? "Gravando áudio..." : "Digite uma mensagem..."} value={texto} onChange={(e) => setTexto(e.target.value)} disabled={gravandoAudioMsg} style={{ flex: 1, background: '#121e24', border: '1px solid #1f2d35', color: '#fff', padding: '14px 16px', borderRadius: '24px', outline: 'none', fontSize: '15px' }} />
+                  <input type="text" placeholder={gravandoAudioMsg ? "Gravando áudio..." : "Conversar no Ninho..."} value={texto} onChange={(e) => setTexto(e.target.value)} disabled={gravandoAudioMsg} style={{ flex: 1, background: '#121e24', border: '1px solid #1f2d35', color: '#fff', padding: '14px 16px', borderRadius: '24px', outline: 'none', fontSize: '15px' }} />
                   <button type="button" onClick={alternarGravacaoAudioMsg} style={{ background: gravandoAudioMsg ? 'rgba(244,63,94,0.2)' : '#121e24', border: gravandoAudioMsg ? '1px solid #f43f5e' : '1px solid #1f2d35', borderRadius: '50%', width: '46px', height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', transition: 'all 0.2s' }}>
                     {gravandoAudioMsg ? "🛑" : "🎙️"}
                   </button>
@@ -1230,7 +1266,38 @@ export default function ChatPage() {
         </div>
       </main>
 
-      {/* MODAL DE PERFIL TURBINADO COM FOTO DA GALERIA */}
+      {/* MODAL DE PERFIL DO AMIGO (NOVO) */}
+      {perfilAmigoSelecionado && (
+        <div onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '350px', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', background: 'linear-gradient(180deg, #12212b 0%, #0b141a 100%)' }}>
+              <button onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'absolute', top: '16px', right: '20px', background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer' }}>✖</button>
+              
+              <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#1a2830', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '50px', border: '3px solid #2dd4bf', overflow: 'hidden' }}>
+                {perfilAmigoSelecionado.avatar && perfilAmigoSelecionado.avatar.startsWith("data:image/") ? (
+                  <img src={perfilAmigoSelecionado.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  perfilAmigoSelecionado.avatar || "🦆"
+                )}
+              </div>
+              
+              <div style={{ textAlign: 'center' }}>
+                <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#fff' }}>{perfilAmigoSelecionado.name}</h2>
+                <span style={{ fontSize: '14px', color: '#2dd4bf', fontFamily: 'monospace', fontWeight: 'bold' }}>#{perfilAmigoSelecionado.tag}</span>
+              </div>
+
+              <div style={{ background: '#121e24', width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid #1f2d35', textAlign: 'center' }}>
+                <p style={{ margin: 0, color: '#e2e8f0', fontSize: '14px', fontStyle: 'italic' }}>"{perfilAmigoSelecionado.bio || 'Mergulhando no lago...'}"</p>
+                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #1f2d35', fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                  IDENTIDADE: <span style={{ color: '#fff' }}>{perfilAmigoSelecionado.gender || 'Prefere não dizer'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OUTROS MODAIS EXISTENTES (CONFIGURAÇÕES E AMIGOS) */}
       {modalPerfilAberto && (
         <div onClick={fecharModalPerfil} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '400px', maxHeight: '90vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
@@ -1273,7 +1340,6 @@ export default function ChatPage() {
                     <input type="text" value={meuStatusBio} onChange={(e) => setMeuStatusBio(e.target.value)} maxLength={50} className="pro-input" />
                   </div>
 
-                  {/* 🖼️ SELEÇÃO DE AVATAR (EMOJIS + FOTO DA GALERIA) */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <label className="pro-label">AVATAR DO PERFIL</label>
                     <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1356,7 +1422,6 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* MODAL DE AMIGOS */}
       {modalAmigosAberto && (
         <div onClick={() => setModalAmigosAberto(false)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '450px', minHeight: '400px', maxHeight: '80vh', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
@@ -1461,4 +1526,3 @@ export default function ChatPage() {
     </div>
   );
 }
-// att
