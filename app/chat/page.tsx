@@ -804,6 +804,14 @@ export default function ChatPage() {
       <style dangerouslySetInnerHTML={{__html: `
         /* RESET E ESTRUTURA GLOBAL */
         .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: #020d12; color: #fff; font-family: sans-serif; }
+        
+        /* 🔥 NOVO: SCROLLBAR MODERNO E DARK 🔥 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(45, 212, 191, 0.3); }
+        * { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.05) transparent; }
+        
         .sidebar { width: 340px; background: #0b141a; border-right: 1px solid #1f2d35; display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100; flex-shrink: 0; }
         .main-chat-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; background: #020d12; }
         .hamburger-btn { display: none; background: transparent; border: none; color: #fff; font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
@@ -891,7 +899,7 @@ export default function ChatPage() {
         .d-call-subtitle { color: #949ba4; font-size: 12px; font-weight: 500; }
         .d-call-actions { display: flex; gap: 12px; }
         .d-action-btn { width: 40px; height: 40px; border-radius: 50%; background-color: #2b2d31; border: 1px solid transparent; color: #dbdee1; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; }
-        .d-action-btn:hover { background-color: #313338; border-color: #dbdee1; }
+        .d-action-btn:hover { background: #313338; border-color: #dbdee1; }
         .d-action-btn.btn-muted { background-color: #da373c; color: #fff; }
         .d-action-btn.btn-disconnect { background-color: #da373c; color: #fff; border-radius: 24px; width: auto; padding: 0 16px; font-size: 14px; font-weight: 700; gap: 8px; }
         
@@ -1214,7 +1222,6 @@ export default function ChatPage() {
                 {msgsAtuais.map((msg) => {
                   const meuNomeRealAqui = `${meuNomeReal}#${minhaTag}`;
                   
-                  // 🧹 LIMPEZA AUTOMÁTICA: Remove código Base64 antigo se estiver no nome
                   let nomeLimpo = msg.usuario;
                   if (nomeLimpo.includes("data:image")) {
                     const match = nomeLimpo.match(/([a-zA-Z0-9_ -]+#\d{4})/);
@@ -1231,7 +1238,7 @@ export default function ChatPage() {
                   } else {
                     if (eSistema) avatarMsg = "🤖";
                     else if (eMinha) avatarMsg = meuAvatar;
-                    else avatarMsg = chatAtivoData?.icone || "🦆"; 
+                    else avatarMsg = chatAtivoData?.amigoRef?.avatar || chatAtivoData?.icone || "🦆"; 
                   }
 
                   return (
