@@ -497,7 +497,8 @@ export default function ChatPage() {
     socket.on("webrtc_answer", async (data) => {
       if (peerConnectionRef.current) { 
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); 
-        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e){} });
+        // 👇 AQUI ESTAVA O BUG DO DATA.CANDIDATE. FOI CORRIGIDO PARA (C) 👇
+        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} });
         iceCandidatesQueue.current = [];
         setChamadaAtiva(true); 
       }
@@ -1006,9 +1007,18 @@ export default function ChatPage() {
 
           {(isLagoa ? lagoaAtiva : true) && (
             <>
-              {isLagoa && statusConvite && (
-                <div style={{ background: "rgba(6,24,33,0.9)", border: "1px solid #2dd4bf", color: "#fff", padding: "10px", textAlign: "center", borderRadius: "10px", margin: "10px 16px" }}>
-                  {statusConvite}
+              {/* 👇 CORREÇÃO: O STATUS VISUAL DA CHAMADA AGORA APARECE AQUI! 👇 */}
+              {statusConvite && (
+                <div style={{ 
+                  background: "rgba(6,24,33,0.9)", border: "1px solid #2dd4bf", color: "#fff", 
+                  padding: "10px 16px", textAlign: "center", borderRadius: "10px", margin: "10px 16px",
+                  display: (!isLagoa && statusConvite.includes("Chamando")) ? "flex" : "block", 
+                  justifyContent: "space-between", alignItems: "center" 
+                }}>
+                  <span>{statusConvite}</span>
+                  {!isLagoa && statusConvite.includes("Chamando") && (
+                     <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>Cancelar ✖</button>
+                  )}
                 </div>
               )}
 
