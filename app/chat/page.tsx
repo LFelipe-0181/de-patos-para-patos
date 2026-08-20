@@ -933,7 +933,7 @@ export default function ChatPage() {
         .btn-enviar { background: linear-gradient(135deg, #0ea5e9, #2dd4bf); color: #020617; border: none; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3); transition: transform 0.2s; }
         .btn-enviar:hover { transform: scale(1.05); }
 
-        /* CLASSES CSS COMPACTAS PARA ZERAR ERROS DE SINTAXE DE ESTILO INLINE */
+        /* CLASSES CSS COMPACTAS */
         .status-convite-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #2dd4bf; color: #fff; padding: 12px 20px; text-align: center; border-radius: 12px; margin: 0 auto 20px; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
         .convite-privado-box { background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05)); border: 1px solid #10b981; padding: 20px; text-align: center; border-radius: 20px; margin: 0 auto 20px; max-width: 400px; backdrop-filter: blur(10px); box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .timer-lagoa { padding: 12px; text-align: center; font-size: 12px; font-weight: 800; border-radius: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 12px 16px; transition: all 0.3s; }
@@ -952,7 +952,7 @@ export default function ChatPage() {
         @keyframes pulse-neon { 0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(45, 212, 191, 0); } 100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0); } }
         .d-call-text { display: flex; flex-direction: column; }
         .d-call-title { color: #2dd4bf; font-weight: 800; font-size: 14px; letter-spacing: 0.5px; }
-        .d-call-subtitle { color: #949ba4; font-size: 12px; font-weight: 500; }
+        .d-call-subtitle { color: #94a3b8; font-size: 12px; font-weight: 500; }
         .d-call-actions { display: flex; gap: 10px; }
         .d-action-btn { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid transparent; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: 0.2s; }
         .d-action-btn:hover { background: rgba(255,255,255,0.1); }
@@ -1226,16 +1226,16 @@ export default function ChatPage() {
 
             {(isLagoa ? lagoaAtiva : true) && (
               <>
-                {Boolean(statusConvite) && (
+                {statusConvite ? (
                   <div className="status-convite-box">
                     <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{statusConvite}</span>
-                    {!isLagoa && statusConvite?.includes("Chamando") && (
+                    {!isLagoa && statusConvite.includes("Chamando") ? (
                        <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", marginLeft: "12px" }}>Cancelar</button>
-                    )}
+                    ) : null}
                   </div>
-                )}
+                ) : null}
 
-                {Boolean(isLagoa && convitePendente) && (
+                {isLagoa && convitePendente ? (
                   <div className="convite-privado-box">
                     <div style={{ fontSize: '30px', marginBottom: '10px' }}>🔐</div>
                     <p style={{ color: "#fff", fontWeight: "900", marginBottom: "20px", fontSize: '16px' }}>{convitePendente} quer te levar pro Privado!</p>
@@ -1244,7 +1244,7 @@ export default function ChatPage() {
                       <button onClick={() => responderConvite(true)} style={{ flex: 1, padding: '12px', background: '#10b981', border: 'none', color: '#020617', fontWeight: '900', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(16,185,129,0.3)' }}>Aceitar</button>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {msgsAtuais.map((msg) => {
                   let nomeLimpo = msg.usuario;
@@ -1351,7 +1351,7 @@ export default function ChatPage() {
             <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, #0b141a 100%)', position: 'relative' }}>
               <button onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'absolute', top: '16px', right: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '32px', height: '32px', color: '#94a3b8', fontSize: '16px', cursor: 'pointer', transition: '0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✖</button>
               
-              <div style={{ width: '110px', height: '110px', borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyCenter: 'center', fontSize: '50px', border: '4px solid #2dd4bf', overflow: 'hidden', boxShadow: '0 0 20px rgba(45,212,191,0.3)' }}>
+              <div style={{ width: '110px', height: '110px', borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '50px', border: '4px solid #2dd4bf', overflow: 'hidden', boxShadow: '0 0 20px rgba(45,212,191,0.3)' }}>
                 {perfilAmigoSelecionado.avatar && perfilAmigoSelecionado.avatar.startsWith("data:image/") ? (
                   <img src={perfilAmigoSelecionado.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
