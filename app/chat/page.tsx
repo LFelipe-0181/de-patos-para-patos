@@ -20,7 +20,7 @@ interface ChatPrivado {
   mensagens: Mensagem[];
   naoLida?: boolean;
   icone?: string; 
-  amigoRef?: any; // Guarda os dados do amigo para o Modal de Perfil
+  amigoRef?: any; 
 }
 
 export default function ChatPage() {
@@ -39,7 +39,7 @@ export default function ChatPage() {
   const permiteNotificacoesRef = useRef<boolean>(false);
   
   const [modalPerfilAberto, setModalPerfilAberto] = useState<boolean>(false);
-  const [perfilAmigoSelecionado, setPerfilAmigoSelecionado] = useState<any | null>(null); // MODAL DO AMIGO
+  const [perfilAmigoSelecionado, setPerfilAmigoSelecionado] = useState<any | null>(null); 
   
   const [modalAmigosAberto, setModalAmigosAberto] = useState<boolean>(false);
   const [amigoTagInput, setAmigoTagInput] = useState<string>("");
@@ -52,7 +52,6 @@ export default function ChatPage() {
 
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
 
-  // 🎙️ Controle de Ganho do Microfone e Saída
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
   const [ganhoMicrofone, setGanhoMicrofone] = useState<number>(100);
   const ganhoMicrofoneRef = useRef<number>(100);
@@ -186,12 +185,11 @@ export default function ChatPage() {
                   nomeCustom: amigo.name,
                   mensagens: [],
                   naoLida: false,
-                  icone: amigo.avatar || "🦆", // A FOTO DO AMIGO POR PADRÃO
-                  amigoRef: amigo // GUARDA OS DADOS DELE
+                  icone: amigo.avatar || "🦆", 
+                  amigoRef: amigo 
                 });
                 mudou = true;
               } else {
-                // Atualiza a foto do amigo e a referência
                 novosPrivados[chatIndex].amigoRef = amigo;
                 novosPrivados[chatIndex].icone = amigo.avatar || "🦆";
                 mudou = true;
@@ -313,7 +311,6 @@ export default function ChatPage() {
     return () => clearInterval(interval);
   }, [lagoaAtiva]);
 
-  // 🖼️ FUNÇÃO DE UPLOAD DA GALERIA (AVATAR DE PERFIL)
   const handleUploadMeuAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -332,7 +329,6 @@ export default function ChatPage() {
     }
   };
 
-  // 🖼️ FUNÇÃO DE UPLOAD DA GALERIA (ÍCONE DO CHAT PRIVADO)
   const handleUploadIconeChat = (e: React.ChangeEvent<HTMLInputElement>, chatId: string) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -453,7 +449,6 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // Cria uma copia segura sem a string Base64 pra salvar no localStorage sem estourar memoria
       const dadosLeves = privados.map(chat => ({ ...chat, amigoRef: null }));
       localStorage.setItem("duckzone_ninhos_privados", JSON.stringify(dadosLeves));
     }
@@ -766,7 +761,6 @@ export default function ChatPage() {
           const reader = new FileReader();
           reader.onloadend = () => {
             const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
-            // 🐛 CORREÇÃO: ENVIA APENAS O NOME, SEM MISTURAR COM O AVATAR BASE64!
             if (salaAlvo) socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: abaAtiva !== "lagoa" ? `${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: "🎤 Mensagem de áudio", audio: reader.result as string });
           };
           reader.readAsDataURL(audioBlob);
@@ -787,7 +781,6 @@ export default function ChatPage() {
     if (!texto.trim() && !imagemBase64) return;
     const isPrivado = abaAtiva !== "lagoa"; const salaAlvo = isPrivado ? abaAtiva : lagoaId;
     if (!salaAlvo) return;
-    // 🐛 CORREÇÃO: O AVATAR FOI RETIRADO DAQUI PARA NÃO VAZAR O CÓDIGO GIGANTE NO CHAT
     socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: isPrivado ? `${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: texto, imagem: isPrivado ? imagemBase64 : null });
     setTexto(""); setImagemBase64(null);
   };
@@ -825,7 +818,7 @@ export default function ChatPage() {
           .main-chat-area { width: 100%; }
         }
 
-        /* PERFIL REDESENHADO (ESTILO CARD DISCORD/TELEGRAM) */
+        /* PERFIL REDESENHADO (ESTILO CARD) */
         .sidebar-header { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); background: #0b141a; }
         .back-link { text-decoration: none; color: #94a3b8; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s; }
         .back-link:hover { color: #2dd4bf; }
@@ -854,37 +847,38 @@ export default function ChatPage() {
         .chat-item-sub { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 
         .unread-dot {
-          width: 10px;
-          height: 10px;
-          background-color: #f43f5e;
-          border-radius: 50%;
-          box-shadow: 0 0 6px rgba(244, 63, 94, 0.8);
-          flex-shrink: 0;
+          width: 10px; height: 10px; background-color: #f43f5e; border-radius: 50%; box-shadow: 0 0 6px rgba(244, 63, 94, 0.8); flex-shrink: 0;
         }
 
-        /* 💬 NOVO LAYOUT DO CHAT (ESTILO DISCORD) */
-        .discord-message {
-          display: flex; gap: 16px; margin-top: 4px; padding: 4px 16px; border-radius: 8px; transition: background 0.1s;
-        }
-        .discord-message:hover { background: rgba(255,255,255,0.03); }
-        .discord-message.is-mine { background: rgba(45, 212, 191, 0.05); }
-        .discord-message.is-mine:hover { background: rgba(45, 212, 191, 0.08); }
+        /* 💬 NOVO LAYOUT DO CHAT (ESTILO WHATSAPP/TELEGRAM PREMIUM) */
+        .chat-messages { padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        .message-wrapper { display: flex; gap: 12px; max-width: 85%; }
+        .message-wrapper.is-mine { align-self: flex-end; flex-direction: row; }
+        .message-wrapper.is-other { align-self: flex-start; flex-direction: row; }
+        .message-wrapper.is-system { align-self: center; max-width: 100%; justify-content: center; }
         
-        .discord-avatar {
-          width: 44px; height: 44px; border-radius: 50%; background: #1a2830; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 24px; overflow: hidden; cursor: pointer; transition: transform 0.2s;
-        }
-        .discord-avatar:hover { transform: scale(1.05); }
+        .message-avatar { width: 40px; height: 40px; border-radius: 50%; background: #1a2830; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; overflow: hidden; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); border: 2px solid transparent; transition: 0.2s; }
+        .message-avatar:hover { transform: scale(1.1); }
+        .is-mine .message-avatar { border-color: #2dd4bf; }
+        .is-other .message-avatar { border-color: #64748b; }
+        
+        .message-content { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .is-mine .message-content { align-items: flex-end; }
+        .is-other .message-content { align-items: flex-start; }
+        
+        .message-sender { font-size: 12px; color: #94a3b8; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .message-sender:hover { color: #fff; }
+        
+        .message-bubble { padding: 12px 16px; font-size: 15px; line-height: 1.5; color: #fff; word-break: break-word; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; }
+        .is-mine .message-bubble { background: linear-gradient(135deg, #0d9488, #2dd4bf); color: #020d12; border-radius: 18px 18px 4px 18px; }
+        .is-other .message-bubble { background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 18px 18px 18px 4px; }
+        .is-system .message-bubble { background: #0f172a; color: #cbd5e1; border: 1px dashed #334155; border-radius: 12px; font-size: 13px; text-align: center; }
+        
+        .message-time { font-size: 10px; color: #64748b; margin-top: 2px; display: flex; gap: 8px; align-items: center; font-weight: bold; }
+        .delete-msg { color: #f43f5e; cursor: pointer; opacity: 0; transition: 0.2s; }
+        .message-wrapper:hover .delete-msg { opacity: 1; }
 
-        .discord-msg-content { display: flex; flex-direction: column; flex: 1; }
-        .discord-msg-header { display: flex; alignItems: baseline; gap: 8px; }
-        .discord-username { font-weight: 800; font-size: 15px; cursor: pointer; }
-        .discord-username:hover { text-decoration: underline; }
-        .discord-timestamp { font-size: 11px; color: #64748b; }
-        .discord-text { color: #e2e8f0; font-size: 15px; margin-top: 4px; line-height: 1.4; word-break: break-word; }
-        .discord-delete-btn { opacity: 0; cursor: pointer; font-size: 12px; color: #f43f5e; margin-left: auto; transition: opacity 0.2s; }
-        .discord-message:hover .discord-delete-btn { opacity: 1; }
-
-        /* PAINEL DE LIGAÇÃO DISCORD */
+        /* PAINEL DE LIGAÇÃO */
         .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
         .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5); margin-top: -5px; }
         .discord-slider::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: transparent; }
@@ -1194,47 +1188,83 @@ export default function ChatPage() {
 
           {(isLagoa ? lagoaAtiva : true) && (
             <>
-              <div className="chat-messages" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
+              {statusConvite && (
+                <div style={{ 
+                  background: "rgba(6,24,33,0.9)", border: "1px solid #2dd4bf", color: "#fff", 
+                  padding: "10px 16px", textAlign: "center", borderRadius: "10px", margin: "10px 16px",
+                  display: (!isLagoa && statusConvite.includes("Chamando")) ? "flex" : "block", 
+                  justifyContent: "space-between", alignItems: "center" 
+                }}>
+                  <span>{statusConvite}</span>
+                  {!isLagoa && statusConvite.includes("Chamando") && (
+                     <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>Cancelar ✖</button>
+                  )}
+                </div>
+              )}
+
+              {isLagoa && convitePendente && (
+                <div style={{ background: "rgba(16,185,129,0.15)", border: "1px solid #10b981", padding: "16px", textAlign: "center", borderRadius: "16px", margin: "10px 16px" }}>
+                  <p style={{ color: "#fff", fontWeight: "bold", marginBottom: "12px" }}>🔒 {convitePendente} te convidou para o Privado!</p>
+                  <button onClick={() => responderConvite(true)} style={{ padding: '10px 16px', background: '#10b981', border: 'none', color: '#000', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', marginRight: '10px' }}>Aceitar</button>
+                  <button onClick={() => responderConvite(false)} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid #f43f5e', color: '#f43f5e', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer' }}>Recusar</button>
+                </div>
+              )}
+
+              <div className="chat-messages">
                 {msgsAtuais.map((msg) => {
                   const meuNomeRealAqui = `${meuNomeReal}#${minhaTag}`;
-                  const eMinha = msg.usuario === (isLagoa ? meuNomeAnon : meuNomeRealAqui);
-                  const eSistema = msg.usuario.includes("SISTEMA");
+                  
+                  // 🧹 LIMPEZA AUTOMÁTICA: Remove código Base64 antigo se estiver no nome
+                  let nomeLimpo = msg.usuario;
+                  if (nomeLimpo.includes("data:image")) {
+                    const match = nomeLimpo.match(/([a-zA-Z0-9_ -]+#\d{4})/);
+                    if (match) nomeLimpo = match[1];
+                    else nomeLimpo = nomeLimpo.split(" ").pop() || "Pato";
+                  }
 
-                  // Define a foto baseada no remetente sem passar Base64 pela rede
+                  const eMinha = nomeLimpo === (isLagoa ? meuNomeAnon : meuNomeRealAqui);
+                  const eSistema = nomeLimpo.includes("SISTEMA");
+
                   let avatarMsg = "🦆";
                   if (isLagoa) {
                     avatarMsg = eSistema ? "🤖" : "🎭";
                   } else {
                     if (eSistema) avatarMsg = "🤖";
                     else if (eMinha) avatarMsg = meuAvatar;
-                    else avatarMsg = chatAtivoData?.icone || "🦆"; // Foto oficial do amigo
+                    else avatarMsg = chatAtivoData?.icone || "🦆"; 
                   }
 
                   return (
-                    <div key={msg.id} className={`discord-message ${eMinha && !eSistema ? 'is-mine' : ''}`}>
-                      {/* Avatar no estilo Discord */}
-                      <div className="discord-avatar" onClick={() => { if(!eMinha && !isLagoa && !eSistema && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
-                        {avatarMsg.startsWith("data:image/") ? (
-                          <img src={avatarMsg} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover'}}/>
-                        ) : (
-                          avatarMsg
-                        )}
-                      </div>
+                    <div key={msg.id} className={`message-wrapper ${eMinha && !eSistema ? 'is-mine' : eSistema ? 'is-system' : 'is-other'}`}>
                       
-                      <div className="discord-msg-content">
-                        <div className="discord-msg-header">
-                          <span className="discord-username" style={{ color: eMinha ? '#2dd4bf' : '#f8fafc' }} onClick={() => { if(!eMinha && !isLagoa && !eSistema && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
-                            {msg.usuario}
-                          </span>
-                          <span className="discord-timestamp">{msg.hora}</span>
-                          {eMinha && !eSistema && <span className="discord-delete-btn" onClick={() => apagarMensagem(msg.id)}>🗑️ Excluir</span>}
+                      {!eMinha && !eSistema && (
+                        <div className="message-avatar" onClick={() => { if(!isLagoa && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
+                          {avatarMsg.startsWith("data:image/") ? <img src={avatarMsg} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover'}}/> : avatarMsg}
                         </div>
-                        <div className="discord-text">
+                      )}
+                      
+                      <div className="message-content">
+                        {!eSistema && (
+                          <span className="message-sender" onClick={() => { if(!eMinha && !isLagoa && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
+                            {nomeLimpo}
+                          </span>
+                        )}
+                        <div className="message-bubble">
                           {msg.mensagem}
                           {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "300px", borderRadius: "8px", marginTop: "8px", display: 'block' }} />}
                           {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%", height: '36px', display: 'block' }} />}
                         </div>
+                        <div className="message-time">
+                          {msg.hora}
+                          {eMinha && !eSistema && <span className="delete-msg" onClick={() => apagarMensagem(msg.id)}>🗑️</span>}
+                        </div>
                       </div>
+
+                      {eMinha && !eSistema && (
+                        <div className="message-avatar">
+                          {avatarMsg.startsWith("data:image/") ? <img src={avatarMsg} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover'}}/> : avatarMsg}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
