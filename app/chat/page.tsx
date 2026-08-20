@@ -590,7 +590,7 @@ export default function ChatPage() {
     socket.on("webrtc_answer", async (data) => {
       if (peerConnectionRef.current) { 
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); 
-        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} });
+        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e){} });
         iceCandidatesQueue.current = [];
         setChamadaAtiva(true); 
       }
@@ -803,177 +803,96 @@ export default function ChatPage() {
       <audio ref={testAudioRef} autoPlay playsInline muted={false} style={{ display: 'none' }} />
 
       <style dangerouslySetInnerHTML={{__html: `
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
-
-        /* 🚀 DESIGN PREMIUM DARK/CYBERPUNK E GLASSMORPHISM */
-        .app-layout { 
-          display: flex; width: 100vw; height: 100vh; overflow: hidden; 
-          font-family: 'Inter', sans-serif; color: #fff;
-          background-color: #020617; 
-          background-image: 
-            radial-gradient(circle at 10% 20%, rgba(45, 212, 191, 0.08) 0%, transparent 40%),
-            radial-gradient(circle at 90% 80%, rgba(14, 165, 233, 0.08) 0%, transparent 40%);
-        }
-        
-        /* 🔥 SCROLLBAR INVISÍVEL ELEGANTE */
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(45, 212, 191, 0.5); }
-        * { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.1) transparent; }
-        
-        /* SIDEBAR FLUTUANTE DE VIDRO */
-        .sidebar { 
-          width: 340px; display: flex; flex-direction: column; z-index: 100; flex-shrink: 0; 
-          margin: 16px 0 16px 16px; border-radius: 24px;
-          background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(20px);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .main-chat-area { 
-          flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; 
-          padding: 16px;
-        }
-
-        .chat-container-inner {
-          flex: 1; display: flex; flex-direction: column;
-          background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px);
-          border-radius: 24px; border: 1px solid rgba(255,255,255,0.05);
-          box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-          overflow: hidden;
-        }
-
+        .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: #020d12; color: #fff; font-family: sans-serif; }
+        .sidebar { width: 340px; background: #0b141a; border-right: 1px solid #1f2d35; display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100; flex-shrink: 0; }
+        .main-chat-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; background: #020d12; }
         .hamburger-btn { display: none; background: transparent; border: none; color: #fff; font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
         .hamburger-btn:active { transform: scale(0.9); }
-        .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 90; backdrop-filter: blur(5px); }
+        .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 90; backdrop-filter: blur(3px); }
         
         @media (max-width: 768px) {
-          .sidebar { position: absolute; height: calc(100% - 32px); top: 0; left: 0; transform: translateX(-110%); max-width: 85vw; }
+          .sidebar { position: absolute; height: 100%; top: 0; left: 0; transform: translateX(-100%); max-width: 85vw; box-shadow: 5px 0 25px rgba(0,0,0,0.5); }
           .sidebar.open { transform: translateX(0); }
           .hamburger-btn { display: block; }
           .menu-overlay.open { display: block; }
-          .main-chat-area { padding: 8px; width: 100%; }
+          .main-chat-area { width: 100%; }
         }
 
-        /* PERFIL DE VIDRO */
-        .sidebar-header { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .sidebar-header { padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); background: #0b141a; }
         .back-link { text-decoration: none; color: #94a3b8; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s; }
         .back-link:hover { color: #2dd4bf; }
 
-        .profile-card-container { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .profile-card { background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8)); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .profile-card-avatar { width: 48px; height: 48px; background: rgba(0,0,0,0.3); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 1px solid rgba(45,212,191,0.3); flex-shrink: 0; overflow: hidden; box-shadow: 0 0 10px rgba(45,212,191,0.2); }
+        .profile-card-container { padding: 12px 16px; border-bottom: 1px solid #1f2d35; }
+        .profile-card { background: linear-gradient(135deg, #0f1c24, #12212b); border: 1px solid #1f2d35; border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .profile-card-avatar { width: 46px; height: 48px; background: #1a2830; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 1px solid rgba(45,212,191,0.2); flex-shrink: 0; overflow: hidden; }
         .profile-card-details { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
-        .profile-card-name { font-size: 14px; font-weight: 900; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.5px; }
+        .profile-card-name { font-size: 14px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .profile-card-tag { font-size: 11px; color: #2dd4bf; font-family: monospace; font-weight: bold; }
         .profile-card-bio { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 
         .profile-actions-inline { display: flex; gap: 6px; }
-        .icon-action-btn { width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.05); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; cursor: pointer; transition: all 0.2s; }
-        .icon-action-btn:hover { background: #2dd4bf; color: #020617; border-color: #2dd4bf; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3); }
+        .icon-action-btn { width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; cursor: pointer; transition: all 0.2s; }
+        .icon-action-btn:hover { background: #2dd4bf; color: #020d12; border-color: #2dd4bf; transform: translateY(-1px); }
 
-        /* LISTA DE CHATS */
-        .chat-list { display: flex; flex-direction: column; overflow-y: auto; flex: 1; padding: 12px; gap: 6px; }
-        .chat-item { display: flex; align-items: center; padding: 12px; gap: 14px; cursor: pointer; transition: all 0.2s; border-radius: 14px; border: 1px solid transparent; }
-        .chat-item:hover { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.05); }
-        .chat-item.active { background: rgba(45, 212, 191, 0.1); border-color: rgba(45, 212, 191, 0.2); box-shadow: inset 0 0 20px rgba(45, 212, 191, 0.05); }
+        .chat-list { display: flex; flex-direction: column; overflow-y: auto; flex: 1; padding: 12px 12px; gap: 6px; }
+        .chat-item { display: flex; align-items: center; padding: 10px 14px; gap: 14px; cursor: pointer; transition: all 0.2s; border-radius: 12px; border: 1px solid transparent; }
+        .chat-item:hover { background: #121e24; border-color: rgba(255,255,255,0.04); }
+        .chat-item.active { background: rgba(45, 212, 191, 0.1); border-color: rgba(45, 212, 191, 0.3); }
         
-        .chat-item-avatar { width: 44px; height: 44px; border-radius: 14px; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; overflow: hidden; }
+        .chat-item-avatar { width: 42px; height: 42px; border-radius: 12px; background: #1a2830; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; overflow: hidden; }
         .chat-item-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-        .chat-item-title { font-weight: 800; font-size: 14px; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.3px; }
+        .chat-item-title { font-weight: 700; font-size: 14px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chat-item-sub { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 
-        .unread-dot { width: 10px; height: 10px; background-color: #f43f5e; border-radius: 50%; box-shadow: 0 0 10px rgba(244, 63, 94, 0.8); flex-shrink: 0; }
+        .unread-dot { width: 10px; height: 10px; background-color: #f43f5e; border-radius: 50%; box-shadow: 0 0 6px rgba(244, 63, 94, 0.8); flex-shrink: 0; }
 
-        /* 💬 HEADER DO CHAT */
-        .chat-header { display: flex; padding: 16px 24px; background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center; justify-content: space-between; z-index: 10; }
-
-        /* 💬 MENSAGENS */
-        .chat-messages { padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; flex: 1; }
-        .message-wrapper { display: flex; gap: 12px; max-width: 80%; animation: slideUp 0.3s ease-out forwards; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .message-wrapper.is-mine { align-self: flex-end; flex-direction: row; }
-        .message-wrapper.is-other { align-self: flex-start; flex-direction: row; }
-        .message-wrapper.is-system { align-self: center; max-width: 100%; justify-content: center; }
-        
-        .message-avatar { width: 38px; height: 38px; border-radius: 50%; background: rgba(0,0,0,0.3); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; overflow: hidden; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s; border: 2px solid transparent; }
-        .message-avatar:hover { transform: scale(1.1); box-shadow: 0 6px 15px rgba(0,0,0,0.5); }
-        .is-mine .message-avatar { border-color: rgba(45, 212, 191, 0.5); }
-        .is-other .message-avatar { border-color: rgba(255, 255, 255, 0.1); }
-        
-        .message-content { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-        .is-mine .message-content { align-items: flex-end; }
-        .is-other .message-content { align-items: flex-start; }
-        
-        .message-sender { font-size: 12px; color: #94a3b8; font-weight: 800; cursor: pointer; transition: 0.2s; letter-spacing: 0.5px; }
-        .message-sender:hover { color: #2dd4bf; }
-        
-        .message-bubble { padding: 12px 18px; font-size: 15px; line-height: 1.5; color: #fff; word-break: break-word; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; }
-        .is-mine .message-bubble { background: linear-gradient(135deg, #0ea5e9, #2dd4bf); color: #020617; border-radius: 20px 20px 4px 20px; font-weight: 500; }
-        .is-other .message-bubble { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); color: #f8fafc; border: 1px solid rgba(255,255,255,0.05); border-radius: 20px 20px 20px 4px; }
-        .is-system .message-bubble { background: rgba(15, 23, 42, 0.8); color: #cbd5e1; border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px; font-size: 12px; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
-        
-        .message-time { font-size: 10px; color: #64748b; margin-top: 4px; display: flex; gap: 8px; align-items: center; font-weight: 800; }
-        .delete-msg { color: #f43f5e; cursor: pointer; opacity: 0; transition: 0.2s; background: rgba(244,63,94,0.1); padding: 2px 6px; border-radius: 4px; }
-        .message-wrapper:hover .delete-msg { opacity: 1; }
-
-        /* INPUT DE MENSAGEM */
-        .chat-input-container { padding: 16px 24px; background: rgba(15, 23, 42, 0.6); border-top: 1px solid rgba(255,255,255,0.05); }
-        .chat-input-wrapper { display: flex; gap: 12px; align-items: center; background: rgba(0,0,0,0.3); padding: 6px 6px 6px 16px; border-radius: 99px; border: 1px solid rgba(255,255,255,0.05); transition: border 0.3s; }
-        .chat-input-wrapper:focus-within { border-color: rgba(45, 212, 191, 0.5); box-shadow: 0 0 15px rgba(45, 212, 191, 0.1); }
-        .chat-input-field { flex: 1; background: transparent; border: none; color: #fff; outline: none; font-size: 15px; font-family: 'Inter', sans-serif; }
-        .chat-input-field::placeholder { color: #64748b; }
-
-        .btn-anexo { cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; color: #94a3b8; transition: 0.2s; padding: 8px; border-radius: 50%; }
-        .btn-anexo:hover { color: #2dd4bf; background: rgba(45, 212, 191, 0.1); }
-        
-        .btn-enviar { background: linear-gradient(135deg, #0ea5e9, #2dd4bf); color: #020617; border: none; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3); transition: transform 0.2s; }
-        .btn-enviar:hover { transform: scale(1.05); }
-
-        /* CLASSES CSS COMPACTAS */
-        .status-convite-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #2dd4bf; color: #fff; padding: 12px 20px; text-align: center; border-radius: 12px; margin: 0 auto 20px; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); backdrop-filter: blur(10px); }
-        .convite-privado-box { background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05)); border: 1px solid #10b981; padding: 20px; text-align: center; border-radius: 20px; margin: 0 auto 20px; max-width: 400px; backdrop-filter: blur(10px); box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .timer-lagoa { padding: 12px; text-align: center; font-size: 12px; font-weight: 800; border-radius: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 12px 16px; transition: all 0.3s; }
-        .timer-lagoa.safe { background-color: rgba(45, 212, 191, 0.05); border: 1px dashed #2dd4bf; color: #2dd4bf; }
-        .timer-lagoa.danger { background-color: rgba(244, 63, 94, 0.1); border: 1px dashed #f43f5e; color: #f43f5e; }
-        .matching-card { margin: auto; text-align: center; padding: 40px; background: rgba(15, 23, 42, 0.8); border-radius: 24px; border: 1px solid rgba(255,255,255,0.05); max-width: 450px; backdrop-filter: blur(20px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
-
-        /* PAINEL DE LIGAÇÃO */
         .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
-        .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #2dd4bf; border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px rgba(45,212,191,0.5); margin-top: -5px; }
-        .discord-slider::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: rgba(255,255,255,0.1); border-radius: 3px; }
-        
-        .discord-call-panel-v2 { background: rgba(15, 23, 42, 0.8); border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; }
+        .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5); margin-top: -5px; }
+        .discord-slider::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: transparent; }
+        .discord-call-panel-v2 { background-color: #111214; border: 1px solid #1e1f22; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; margin: 10px 16px; }
         .d-call-info { display: flex; align-items: center; gap: 12px; }
-        .d-call-dot { width: 10px; height: 10px; background-color: #2dd4bf; border-radius: 50%; box-shadow: 0 0 10px rgba(45, 212, 191, 0.6); animation: pulse-neon 2s infinite; }
-        @keyframes pulse-neon { 0% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(45, 212, 191, 0); } 100% { box-shadow: 0 0 0 0 rgba(45, 212, 191, 0); } }
+        .d-call-dot { width: 12px; height: 12px; background-color: #23a559; border-radius: 50%; box-shadow: 0 0 8px rgba(35, 165, 89, 0.6); animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(35, 165, 89, 0); } 100% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0); } }
         .d-call-text { display: flex; flex-direction: column; }
-        .d-call-title { color: #2dd4bf; font-weight: 800; font-size: 14px; letter-spacing: 0.5px; }
-        .d-call-subtitle { color: #94a3b8; font-size: 12px; font-weight: 500; }
-        .d-call-actions { display: flex; gap: 10px; }
-        .d-action-btn { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid transparent; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: 0.2s; }
-        .d-action-btn:hover { background: rgba(255,255,255,0.1); }
-        .d-action-btn.btn-muted { background-color: rgba(244,63,94,0.2); color: #f43f5e; border-color: rgba(244,63,94,0.3); }
-        .d-action-btn.btn-disconnect { background: #f43f5e; color: #fff; border-radius: 20px; width: auto; padding: 0 16px; font-size: 13px; font-weight: 800; gap: 6px; box-shadow: 0 4px 10px rgba(244,63,94,0.3); }
-
-        .pro-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #fff; padding: 14px 16px; border-radius: 12px; font-size: 14px; outline: none; transition: 0.2s; }
+        .d-call-title { color: #23a559; font-weight: 700; font-size: 14px; }
+        .d-call-subtitle { color: #949ba4; font-size: 12px; font-weight: 500; }
+        .d-call-actions { display: flex; gap: 12px; }
+        .d-action-btn { width: 40px; height: 40px; border-radius: 50%; background-color: #2b2d31; border: 1px solid transparent; color: #dbdee1; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; }
+        .d-action-btn:hover { background-color: #313338; border-color: #dbdee1; }
+        .d-action-btn.btn-muted { background-color: #da373c; color: #fff; }
+        .d-action-btn.btn-disconnect { background-color: #da373c; color: #fff; border-radius: 24px; width: auto; padding: 0 16px; font-size: 14px; font-weight: 700; gap: 8px; }
+        
+        .pro-input { width: 100%; background: #121e24; border: 1px solid #1f2d35; color: #fff; padding: 14px 16px; border-radius: 12px; font-size: 14px; outline: none; }
         .pro-input:focus { border-color: #2dd4bf; box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.1); }
-        .pro-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
-        .avatar-btn { font-size: 26px; padding: 10px; border-radius: 14px; cursor: pointer; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); flex: 1; display: flex; justify-content: center; transition: 0.2s; }
-        .avatar-btn:hover { transform: translateY(-2px); }
-        .avatar-btn.active { background: rgba(45, 212, 191, 0.15); border-color: #2dd4bf; box-shadow: 0 4px 10px rgba(45,212,191,0.2); }
-        .btn-test-mic { width: 100%; padding: 16px; border-radius: 12px; cursor: pointer; font-weight: 900; font-size: 14px; border: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.3); color: #2dd4bf; display: flex; justify-content: center; gap: 8px; transition: 0.2s; }
-        .btn-test-mic.active { border-color: #f43f5e; color: #f43f5e; background: rgba(244, 63, 94, 0.1); box-shadow: 0 0 15px rgba(244,63,94,0.2); }
+        .pro-label { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
+        .avatar-btn { font-size: 26px; padding: 10px; border-radius: 14px; cursor: pointer; background: #121e24; border: 1px solid #1f2d35; flex: 1; display: flex; justify-content: center; }
+        .avatar-btn.active { background: rgba(45, 212, 191, 0.15); border-color: #2dd4bf; }
+        .btn-test-mic { width: 100%; padding: 16px; border-radius: 12px; cursor: pointer; font-weight: 800; font-size: 14px; border: 1px solid #1f2d35; background: #121e24; color: #f43f5e; display: flex; justify-content: center; gap: 8px;}
+        .btn-test-mic.active { border-color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
         
-        .friend-card { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 16px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 12px; transition: all 0.2s ease; cursor: pointer; }
-        .friend-card:hover { background: rgba(15,23,42,0.8); border-color: #2dd4bf; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.4); }
+        .friend-card { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: #121e24; border-radius: 16px; border: 1px solid #1f2d35; margin-bottom: 12px; transition: all 0.2s ease; cursor: pointer; }
+        .friend-card:hover { background: #1a2830; border-color: #2dd4bf; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .friend-avatar-wrap { position: relative; width: 48px; height: 48px; background: #0b141a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); overflow: hidden; }
+        .friend-info { display: flex; flex-direction: column; }
+        .friend-name { font-weight: 800; font-size: 16px; color: #fff; display: flex; align-items: center; gap: 6px; }
+        .friend-tag { font-size: 13px; color: #94a3b8; font-family: monospace; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 6px; }
+        .chat-action-btn { width: 40px; height: 40px; border-radius: 50%; background: rgba(45, 212, 191, 0.1); border: 1px solid rgba(45, 212, 191, 0.2); display: flex; align-items: center; justify-content: center; font-size: 18px; color: #2dd4bf; transition: all 0.2s; }
+        .friend-card:hover .chat-action-btn { background: #2dd4bf; color: #000; transform: scale(1.1); }
+        .btn-accept { background: #10b981; color: #020d12; border: none; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 900; transition: 0.2s; }
+        .btn-accept:hover { background: #059669; transform: scale(1.05); }
+        .btn-reject { background: transparent; color: #f43f5e; border: 1px solid #f43f5e; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 900; transition: 0.2s; }
+        .btn-reject:hover { background: rgba(244, 63, 94, 0.1); transform: scale(1.05); }
         
-        .pref-btn { flex: 1; padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 800; cursor: pointer; text-align: center; border: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.3); color: #94a3b8; transition: 0.2s; letter-spacing: 0.5px; }
-        .pref-btn:hover { background: rgba(255,255,255,0.05); }
-        .pref-btn.active { background: linear-gradient(135deg, rgba(14,165,233,0.2), rgba(45,212,191,0.2)); border-color: #2dd4bf; color: #2dd4bf; box-shadow: 0 0 15px rgba(45,212,191,0.1); }
+        .pref-btn { flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; text-align: center; border: 1px solid #1f2d35; background: #121e24; color: #94a3b8; transition: 0.2s; }
+        .pref-btn.active { background: rgba(45, 212, 191, 0.15); border-color: #2dd4bf; color: #2dd4bf; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        @media (max-width: 500px) {
+          .hide-on-mobile { display: none !important; }
+          .d-call-info { max-width: 50%; }
+          .d-call-subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        }
       `}} />
 
       <aside className={`sidebar ${menuAberto ? 'open' : ''}`}>
@@ -1035,97 +954,106 @@ export default function ChatPage() {
       </aside>
 
       <main className="main-chat-area">
-        <div className="chat-container-inner">
-          <header className="chat-header">
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <button className="hamburger-btn" onClick={() => setMenuAberto(true)}>☰</button>
-              
-              {editandoNome === abaAtiva && !isLagoa ? (
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <select 
-                    value={chatAtivoData?.icone?.startsWith("data:image/") ? "🔒" : chatAtivoData?.icone || "🔒"}
-                    onChange={(e) => setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, icone: e.target.value } : p))}
-                    style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '6px', padding: '8px', outline: 'none', fontSize: '18px', cursor: 'pointer' }}
-                  >
-                    {["🔒", "🦆", "❤️", "🔥", "🚀", "🎮", "🎵", "⭐", "💼", "🍻", "😎", "👾", "🤖", "🍕"].map(emoji => (
-                      <option key={emoji} value={emoji}>{emoji}</option>
-                    ))}
-                  </select>
+        <header className="chat-header" style={{ display: 'flex', padding: '16px 20px', background: '#0b141a', borderBottom: '1px solid #1f2d35', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <button className="hamburger-btn" onClick={() => setMenuAberto(true)}>☰</button>
+            
+            {editandoNome === abaAtiva && !isLagoa ? (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <select 
+                  value={chatAtivoData?.icone?.startsWith("data:image/") ? "🔒" : chatAtivoData?.icone || "🔒"}
+                  onChange={(e) => setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, icone: e.target.value } : p))}
+                  style={{ background: '#121e24', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '6px', padding: '8px', outline: 'none', fontSize: '18px', cursor: 'pointer' }}
+                >
+                  {["🔒", "🦆", "❤️", "🔥", "🚀", "🎮", "🎵", "⭐", "💼", "🍻", "😎", "👾", "🤖", "🍕"].map(emoji => (
+                    <option key={emoji} value={emoji}>{emoji}</option>
+                  ))}
+                </select>
 
-                  <label style={{ cursor: 'pointer', background: 'rgba(0,0,0,0.3)', border: '1px solid #2dd4bf', color: '#2dd4bf', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    🖼️ Foto
-                    <input type="file" accept="image/*" onChange={(e) => handleUploadIconeChat(e, abaAtiva)} style={{ display: 'none' }} />
-                  </label>
+                <label style={{ cursor: 'pointer', background: '#121e24', border: '1px solid #2dd4bf', color: '#2dd4bf', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  🖼️ Foto
+                  <input type="file" accept="image/*" onChange={(e) => handleUploadIconeChat(e, abaAtiva)} style={{ display: 'none' }} />
+                </label>
 
-                  <input 
-                    value={nomePrivadoInput} 
-                    onChange={(e) => setNomePrivadoInput(e.target.value)}
-                    onKeyDown={(e) => { 
-                      if (e.key === 'Enter') {
-                        setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
-                        setEditandoNome(null);
-                      }
-                    }}
-                    autoFocus
-                    style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '6px', padding: '8px 10px', outline: 'none', fontSize: '16px', fontWeight: 'bold', maxWidth: '140px' }}
-                  />
-                  <button onClick={() => {
-                    setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
-                    setEditandoNome(null);
-                  }} style={{background: 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', color: '#020617', padding: '8px 12px', borderRadius: '6px', fontWeight: 'bold', border: 'none', cursor: 'pointer'}}>OK</button>
-                  
-                  <button onClick={() => {
-                    if(confirm("Tem certeza que deseja apagar e sair deste chat?")) {
-                      setPrivados(prev => prev.filter(p => p.id !== abaAtiva));
-                      setAbaAtiva("lagoa");
+                <input 
+                  value={nomePrivadoInput} 
+                  onChange={(e) => setNomePrivadoInput(e.target.value)}
+                  onKeyDown={(e) => { 
+                    if (e.key === 'Enter') {
+                      setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
                       setEditandoNome(null);
                     }
-                  }} style={{background: 'rgba(244,63,94,0.2)', color: '#f43f5e', padding: '8px 12px', borderRadius: '6px', fontWeight: 'bold', border: '1px solid rgba(244,63,94,0.5)', cursor: 'pointer', marginLeft: '6px'}} title="Apagar Chat Definitivamente">🗑️</button>
-                </div>
-              ) : (
-                <span 
-                  style={{ fontSize: "18px", fontWeight: "900", color: "#fff", display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '0.5px' }}
-                >
-                  {isLagoa ? "Mergulho Anônimo" : (
-                    <>
-                      <span style={{ cursor: 'pointer' }} onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}>
-                        {chatAtivoData?.icone?.startsWith("data:image/") ? (
-                          <img src={chatAtivoData.icone} alt="Icone Chat" style={{ width: '32px', height: '32px', borderRadius: '10px', objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }} />
-                        ) : (
-                          <div style={{ width: '32px', height: '32px', display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.3)', borderRadius:'10px', fontSize:'18px' }}>
-                            {chatAtivoData?.icone || "🔒"}
-                          </div>
-                        )}
-                      </span>
-                      <span style={{ cursor: 'pointer' }} onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}>
-                        {chatAtivoData?.nomeCustom || "Ninho Privado"}
-                      </span>
-                    </>
-                  )}
-                  {!isLagoa && <span onClick={() => { setEditandoNome(abaAtiva); setNomePrivadoInput(chatAtivoData?.nomeCustom || `Ninho Privado`); }} style={{fontSize: '14px', marginLeft: '4px', opacity: 0.5, cursor: 'pointer'}} title="Editar Chat">✏️</span>}
-                </span>
-              )}
-            </div>
+                  }}
+                  autoFocus
+                  style={{ background: '#121e24', color: '#fff', border: '1px solid #2dd4bf', borderRadius: '6px', padding: '8px 10px', outline: 'none', fontSize: '16px', fontWeight: 'bold', maxWidth: '140px' }}
+                />
+                <button onClick={() => {
+                  setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
+                  setEditandoNome(null);
+                }} style={{background: '#2dd4bf', color: '#000', padding: '8px 12px', borderRadius: '6px', fontWeight: 'bold', border: 'none', cursor: 'pointer'}}>OK</button>
+                
+                <button onClick={() => {
+                  if(confirm("Tem certeza que deseja apagar e sair deste chat?")) {
+                    setPrivados(prev => prev.filter(p => p.id !== abaAtiva));
+                    setAbaAtiva("lagoa");
+                    setEditandoNome(null);
+                  }
+                }} style={{background: '#f43f5e', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontWeight: 'bold', border: 'none', cursor: 'pointer', marginLeft: '6px'}} title="Apagar Chat Definitivamente">🗑️</button>
+              </div>
+            ) : (
+              <span 
+                style={{ fontSize: "18px", fontWeight: "900", color: "#fff", display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.5px' }}
+              >
+                {isLagoa ? "Mergulho Anônimo" : (
+                  <>
+                    <span style={{ cursor: 'pointer' }} onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}>
+                      {chatAtivoData?.icone?.startsWith("data:image/") ? (
+                        <img src={chatAtivoData.icone} alt="Icone Chat" style={{ width: '28px', height: '28px', borderRadius: '8px', objectFit: 'cover' }} />
+                      ) : (
+                        chatAtivoData?.icone || "🔒"
+                      )}
+                    </span>
+                    <span style={{ cursor: 'pointer' }} onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}>
+                      {chatAtivoData?.nomeCustom || "Ninho Privado"}
+                    </span>
+                  </>
+                )}
+                {!isLagoa && <span onClick={() => { setEditandoNome(abaAtiva); setNomePrivadoInput(chatAtivoData?.nomeCustom || `Ninho Privado`); }} style={{fontSize: '14px', marginLeft: '4px', opacity: 0.5, cursor: 'pointer'}} title="Editar Chat">✏️</span>}
+              </span>
+            )}
+          </div>
 
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              {!isLagoa && !chamadaAtiva && (
-                <button onClick={solicitarChamadaVoz} className="btn-call-start" style={{ padding: '8px 16px', background: 'rgba(35, 165, 89, 0.15)', color: '#2dd4bf', border: '1px solid rgba(45,212,191,0.5)', borderRadius: '8px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', transition: '0.2s' }}>
-                  📞 <span className="hide-on-mobile">Ligar</span>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {!isLagoa && !chamadaAtiva && (
+              <button onClick={solicitarChamadaVoz} className="btn-call-start" style={{ padding: '8px 16px', background: 'rgba(35, 165, 89, 0.15)', color: '#23a559', border: '1px solid #23a559', borderRadius: '8px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                📞 <span className="hide-on-mobile">Ligar</span>
+              </button>
+            )}
+
+            {isLagoa && lagoaAtiva && (
+              <>
+                <button onClick={solicitarPrivado} style={{ padding: '8px 12px', background: 'rgba(45, 212, 191, 0.1)', color: '#2dd4bf', border: '1px solid #2dd4bf', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  <span className="hide-on-mobile">Puxar </span>🔐
                 </button>
-              )}
+                <button onClick={sairDaLagoa} style={{ padding: '8px 12px', background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e', border: '1px solid #f43f5e', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  <span className="hide-on-mobile">Sair </span>🚪
+                </button>
+              </>
+            )}
+          </div>
+        </header>
 
-              {isLagoa && lagoaAtiva && (
-                <>
-                  <button onClick={solicitarPrivado} style={{ padding: '8px 12px', background: 'rgba(45, 212, 191, 0.1)', color: '#2dd4bf', border: '1px solid rgba(45,212,191,0.5)', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
-                    <span className="hide-on-mobile">Puxar </span>🔐
-                  </button>
-                  <button onClick={sairDaLagoa} style={{ padding: '8px 12px', background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e', border: '1px solid rgba(244,63,94,0.5)', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
-                    <span className="hide-on-mobile">Sair </span>🚪
-                  </button>
-                </>
-              )}
+        <div className="chat-body" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          {isLagoa && lagoaAtiva && tempoRestante !== null && (
+            <div style={{
+              backgroundColor: tempoRestante <= 60 ? 'rgba(244, 63, 94, 0.2)' : 'rgba(45, 212, 191, 0.1)',
+              border: `1px solid ${tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf'}`,
+              color: tempoRestante <= 60 ? '#f43f5e' : '#2dd4bf',
+              padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold', margin: '12px 16px', borderRadius: '10px', transition: 'all 0.3s'
+            }}>
+              {tempoRestante <= 60 ? "⚠️ " : "⏳ "} A Lagoa fechará em {Math.floor(tempoRestante / 60)}:{(tempoRestante % 60).toString().padStart(2, '0')}. Puxe para o Privado!
             </div>
-          </header>
+          )}
 
           {chamadaAtiva && !isLagoa && (
             <div className="discord-call-panel-v2">
@@ -1133,130 +1061,127 @@ export default function ChatPage() {
                 <div className="d-call-dot"></div>
                 <div className="d-call-text">
                   <span className="d-call-title">Voz Conectada</span>
-                  <span className="d-call-subtitle">Sinal Estável</span>
+                  <span className="d-call-subtitle">Ninho Privado</span>
                 </div>
               </div>
               <div className="d-call-actions">
-                <button onClick={() => setModalPerfilAberto(true)} className="d-action-btn hide-on-mobile" title="Configurar Áudio">⚙️</button>
+                <button onClick={() => setModalPerfilAberto(true)} className="d-action-btn hide-on-mobile">⚙️</button>
                 <button onClick={alternarMuteMicrofone} className={`d-action-btn ${microfoneMutado ? "btn-muted" : ""}`}>
                   {microfoneMutado ? "🔇" : "🎙️"}
                 </button>
                 <button onClick={alternarAudioMutado} className={`d-action-btn ${audioMutado ? "btn-muted" : ""}`}>
                   {audioMutado ? "🔕" : "🎧"}
                 </button>
-                <button onClick={desligarChamada} className="d-action-btn btn-disconnect">Desligar</button>
+                <button onClick={desligarChamada} className="d-action-btn btn-disconnect"><span>☎️</span></button>
               </div>
             </div>
           )}
 
           {chamadaRecebida && !chamadaAtiva && !isLagoa && (
-            <div className="discord-call-panel-v2" style={{ background: 'linear-gradient(90deg, rgba(35,165,89,0.2), transparent)' }}>
+            <div className="discord-call-panel-v2" style={{ borderLeft: '4px solid #23a559' }}>
               <div className="d-call-info">
-                <div className="d-call-dot"></div>
+                <div className="d-call-dot" style={{animation: 'pulse-green 1s infinite'}}></div>
                 <div className="d-call-text">
-                  <span className="d-call-title" style={{color: '#fff'}}>Chamada Recebida...</span>
+                  <span className="d-call-title" style={{color: '#fff'}}>Recebendo Chamada...</span>
                   <span className="d-call-subtitle">O outro pato quer falar!</span>
                 </div>
               </div>
               <div className="d-call-actions">
-                <button onClick={atenderChamadaVoz} className="d-action-btn" style={{backgroundColor: '#23a559', color: '#fff', boxShadow: '0 0 15px rgba(35,165,89,0.5)'}}>📞</button>
+                <button onClick={atenderChamadaVoz} className="d-action-btn" style={{backgroundColor: '#23a559', color: '#fff'}}>📞</button>
                 <button onClick={recusarChamadaVoz} className="d-action-btn btn-muted">✖️</button>
               </div>
             </div>
           )}
 
-          <div className="chat-messages">
-            {isLagoa && lagoaAtiva && tempoRestante !== null && (
-              <div className={`timer-lagoa ${tempoRestante <= 60 ? 'danger' : 'safe'}`}>
-                {tempoRestante <= 60 ? "⚠️ " : "⏳ "} A Lagoa fechará em {Math.floor(tempoRestante / 60)}:{(tempoRestante % 60).toString().padStart(2, '0')}
-              </div>
-            )}
-
-            {isLagoa && !lagoaAtiva && !lagoaPendente && !procurando && (
-              <div className="matching-card">
-                <div className="duck-avatar" style={{ fontSize: '80px', marginBottom: '20px', filter: 'drop-shadow(0 0 20px rgba(45,212,191,0.5))' }}>🎭</div>
-                <h2 style={{ fontSize: "28px", fontWeight: "900", color: "#fff", marginBottom: "12px", letterSpacing: '1px' }}>Lagoa Secreta</h2>
-                <p style={{ color: "#94a3b8", fontSize: "15px", marginBottom: "32px", lineHeight: '1.6' }}>Mergulhe anonimamente. Você tem 6 minutos para conhecer alguém antes que a lagoa feche.</p>
+          {isLagoa && !lagoaAtiva && !lagoaPendente && !procurando && (
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px', background: '#0b141a', borderRadius: '16px', border: '1px solid #1f2d35', maxWidth: '450px' }}>
+              <div className="duck-avatar" style={{ fontSize: '80px', marginBottom: '20px' }}>🎭</div>
+              <h2 style={{ fontSize: "28px", fontWeight: "900", color: "#fff", marginBottom: "12px" }}>Lagoa Secreta</h2>
+              <p style={{ color: "#94a3b8", fontSize: "15px", marginBottom: "32px", lineHeight: '1.5' }}>Mergulhe anonimamente. Você tem 6 minutos para conhecer alguém antes que a lagoa feche.</p>
+              
+              <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                <label className="pro-label" style={{ display: 'block', marginBottom: '12px' }}>COM QUEM VOCÊ QUER CONVERSAR?</label>
                 
-                <div style={{ textAlign: 'left', marginBottom: '24px' }}>
-                  <label className="pro-label" style={{ display: 'block', marginBottom: '12px' }}>COM QUEM VOCÊ QUER CONVERSAR?</label>
-                  
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                    <button type="button" onClick={() => togglePreferencia('qualquer')} className={`pref-btn ${preferenciasGenero.includes('qualquer') ? 'active' : ''}`}>Qualquer</button>
-                    <button type="button" onClick={() => togglePreferencia('masculino')} className={`pref-btn ${preferenciasGenero.includes('masculino') ? 'active' : ''}`}>Masculinos</button>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button type="button" onClick={() => togglePreferencia('feminino')} className={`pref-btn ${preferenciasGenero.includes('feminino') ? 'active' : ''}`}>Femininos</button>
-                    <button type="button" onClick={() => togglePreferencia('nao-binario')} className={`pref-btn ${preferenciasGenero.includes('nao-binario') ? 'active' : ''}`}>Não-Binários</button>
-                  </div>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <button type="button" onClick={() => togglePreferencia('qualquer')} className={`pref-btn ${preferenciasGenero.includes('qualquer') ? 'active' : ''}`}>
+                    Qualquer Pessoa
+                  </button>
+                  <button type="button" onClick={() => togglePreferencia('masculino')} className={`pref-btn ${preferenciasGenero.includes('masculino') ? 'active' : ''}`}>
+                    Masculinos
+                  </button>
                 </div>
-
-                <button onClick={procurarPato} style={{ width: '100%', padding: '16px 32px', fontSize: '16px', fontWeight: '900', background: 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', color: '#020617', border: 'none', borderRadius: '14px', cursor: 'pointer', boxShadow: '0 4px 20px rgba(45,212,191,0.4)', transition: '0.2s', textTransform: 'uppercase', letterSpacing: '1px' }}>ENTRAR NA ÁGUA 🚀</button>
-              </div>
-            )}
-
-            {isLagoa && procurando && (
-              <div className="matching-card" style={{ border: '1px solid #2dd4bf', boxShadow: '0 0 40px rgba(45,212,191,0.15)' }}>
-                <div className="radar-spinner" style={{ margin: '0 auto 30px', width: '70px', height: '70px', border: '4px solid rgba(45, 212, 191, 0.1)', borderTopColor: '#2dd4bf', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                <h2 style={{ color: "#2dd4bf", fontSize: '22px', marginBottom: '12px', letterSpacing: '1px', fontWeight: '900' }}>Rastreando...</h2>
-                <p style={{ color: '#94a3b8', fontSize: '15px', marginBottom: '32px' }}>Buscando um pato compatível nas redondezas.</p>
-                
-                <button onClick={cancelarBusca} style={{ background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.5)', color: '#f43f5e', padding: '12px 32px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}>
-                  Cancelar Busca
-                </button>
-              </div>
-            )}
-
-            {isLagoa && lagoaPendente && !lagoaAtiva && (
-              <div className="matching-card" style={{ border: '1px solid #2dd4bf', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
-                <h2 style={{ color: "#fff", marginBottom: "16px", fontSize: '26px', fontWeight: '900' }}>Alvo Encontrado!</h2>
-                <div style={{ display: "inline-block", background: "rgba(45,212,191,0.15)", color: "#2dd4bf", padding: "8px 20px", borderRadius: "20px", fontSize: "14px", fontWeight: "900", marginBottom: "24px", border: '1px solid rgba(45,212,191,0.3)' }}>
-                  Aguardando aceitação: {confirmados}/2
-                </div>
-                <p style={{ color: "#e2e8f0", marginBottom: "32px", fontSize: '16px' }}>Deseja conversar com <strong>{parceiroNomeAnon || "um Pato Misterioso"}</strong>?</p>
-                
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                  <button onClick={recusarConexao} style={{ flex: 1, padding: '14px', background: 'rgba(244,63,94,0.1)', color: '#f43f5e', border: '1px solid rgba(244,63,94,0.5)', borderRadius: '12px', fontWeight: '900', cursor: 'pointer', transition: '0.2s' }}>Pular ❌</button>
-                  <button onClick={aceitarConexao} style={{ flex: 2, padding: '14px', background: jaAceitou ? '#10b981' : 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', color: '#020617', fontWeight: '900', border: 'none', borderRadius: '12px', cursor: jaAceitou ? 'default' : 'pointer', boxShadow: '0 4px 15px rgba(45,212,191,0.3)', transition: '0.2s' }} disabled={jaAceitou}>
-                    {jaAceitou ? "⏳ Aguardando..." : "Conectar! 🚀"}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" onClick={() => togglePreferencia('feminino')} className={`pref-btn ${preferenciasGenero.includes('feminino') ? 'active' : ''}`}>
+                    Femininos
+                  </button>
+                  <button type="button" onClick={() => togglePreferencia('nao-binario')} className={`pref-btn ${preferenciasGenero.includes('nao-binario') ? 'active' : ''}`}>
+                    Não-Binários
                   </button>
                 </div>
               </div>
-            )}
 
-            {(isLagoa ? lagoaAtiva : true) && (
-              <>
-                {statusConvite ? (
-                  <div className="status-convite-box">
-                    <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{statusConvite}</span>
-                    {!isLagoa && statusConvite.includes("Chamando") ? (
-                       <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", marginLeft: "12px" }}>Cancelar</button>
-                    ) : null}
-                  </div>
-                ) : null}
+              <button onClick={procurarPato} style={{ width: '100%', padding: '16px 32px', fontSize: '16px', fontWeight: '900', background: '#2dd4bf', color: '#000', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(45,212,191,0.3)' }}>ENTRAR NA ÁGUA 🚀</button>
+            </div>
+          )}
 
-                {isLagoa && convitePendente ? (
-                  <div className="convite-privado-box">
-                    <div style={{ fontSize: '30px', marginBottom: '10px' }}>🔐</div>
-                    <p style={{ color: "#fff", fontWeight: "900", marginBottom: "20px", fontSize: '16px' }}>{convitePendente} quer te levar pro Privado!</p>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <button onClick={() => responderConvite(false)} style={{ flex: 1, padding: '12px', background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.5)', color: '#f43f5e', fontWeight: 'bold', borderRadius: '10px', cursor: 'pointer' }}>Recusar</button>
-                      <button onClick={() => responderConvite(true)} style={{ flex: 1, padding: '12px', background: '#10b981', border: 'none', color: '#020617', fontWeight: '900', borderRadius: '10px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(16,185,129,0.3)' }}>Aceitar</button>
-                    </div>
-                  </div>
-                ) : null}
+          {isLagoa && procurando && (
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px', background: '#0b141a', border: '1px solid #2dd4bf', borderRadius: '16px', maxWidth: '400px', boxShadow: '0 0 20px rgba(45,212,191,0.1)' }}>
+              <div className="radar-spinner" style={{ margin: '0 auto 24px', width: '60px', height: '60px', border: '4px solid rgba(45, 212, 191, 0.2)', borderTopColor: '#2dd4bf', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+              <h2 style={{ color: "#2dd4bf", fontSize: '20px', marginBottom: '8px' }}>Procurando um Pato...</h2>
+              <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '32px' }}>Aguardando alguém compatível pular na lagoa.</p>
+              
+              <button onClick={cancelarBusca} style={{ background: 'transparent', border: '1px solid #f43f5e', color: '#f43f5e', padding: '12px 24px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}>
+                Cancelar Busca ✖
+              </button>
+            </div>
+          )}
 
+          {isLagoa && lagoaPendente && !lagoaAtiva && (
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px', background: '#0b141a', border: '1px solid #2dd4bf', borderRadius: '20px' }}>
+              <h2 style={{ color: "#fff", marginBottom: "12px", fontSize: '22px' }}>Pato Encontrado!</h2>
+              <div style={{ display: "inline-block", background: "rgba(20,184,166,0.2)", color: "#2dd4bf", padding: "6px 16px", borderRadius: "20px", fontSize: "13px", fontWeight: "bold", marginBottom: "20px" }}>
+                Confirmações: {confirmados}/2
+              </div>
+              <p style={{ color: "#94a3b8", marginBottom: "24px" }}>Deseja falar com <strong>{parceiroNomeAnon || "um Pato Anônimo"}</strong>?</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '200px', margin: '0 auto' }}>
+                <button onClick={aceitarConexao} style={{ padding: '14px', background: jaAceitou ? '#10b981' : '#2dd4bf', color: '#000', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: jaAceitou ? 'default' : 'pointer' }} disabled={jaAceitou}>
+                  {jaAceitou ? "Aguardando... ⏳" : "Conectar! 💚"}
+                </button>
+                <button onClick={recusarConexao} style={{ padding: '14px', background: 'transparent', color: '#f43f5e', border: '1px solid #f43f5e', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Pular ❌</button>
+              </div>
+            </div>
+          )}
+
+          {(isLagoa ? lagoaAtiva : true) && (
+            <>
+              {statusConvite && (
+                <div style={{ 
+                  background: "rgba(6,24,33,0.9)", border: "1px solid #2dd4bf", color: "#fff", 
+                  padding: "10px 16px", textAlign: "center", borderRadius: "10px", margin: "10px 16px",
+                  display: (!isLagoa && statusConvite.includes("Chamando")) ? "flex" : "block", 
+                  justifyContent: "space-between", alignItems: "center" 
+                }}>
+                  <span>{statusConvite}</span>
+                  {!isLagoa && statusConvite.includes("Chamando") && (
+                     <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>Cancelar ✖</button>
+                  )}
+                </div>
+              )}
+
+              {isLagoa && convitePendente && (
+                <div style={{ background: "rgba(16,185,129,0.15)", border: "1px solid #10b981", padding: "16px", textAlign: "center", borderRadius: "16px", margin: "10px 16px" }}>
+                  <p style={{ color: "#fff", fontWeight: "bold", marginBottom: "12px" }}>🔒 {convitePendente} te convidou para o Privado!</p>
+                  <button onClick={() => responderConvite(true)} style={{ padding: '10px 16px', background: '#10b981', border: 'none', color: '#000', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', marginRight: '10px' }}>Aceitar</button>
+                  <button onClick={() => responderConvite(false)} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid #f43f5e', color: '#f43f5e', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer' }}>Recusar</button>
+                </div>
+              )}
+
+              <div className="chat-messages" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
                 {msgsAtuais.map((msg) => {
-                  let nomeLimpo = msg.usuario;
-                  if (nomeLimpo.includes("data:image")) {
-                    const match = nomeLimpo.match(/([a-zA-Z0-9_ -]+#\d{4})/);
-                    if (match) nomeLimpo = match[1];
-                    else nomeLimpo = nomeLimpo.split(" ").pop() || "Pato";
-                  }
-                  nomeLimpo = nomeLimpo.replace(/^[^\w\s]+/, '').trim();
-
-                  const eSistema = nomeLimpo.includes("SISTEMA");
-                  const eMinha = !eSistema && nomeLimpo.includes(`#${minhaTag}`);
+                  const meuNomeRealAqui = `${meuNomeReal}#${minhaTag}`;
+                  const eMinha = msg.usuario === (isLagoa ? meuNomeAnon : meuNomeRealAqui);
+                  const eSistema = msg.usuario.includes("SISTEMA");
 
                   let avatarMsg = "🦆";
                   if (isLagoa) {
@@ -1264,94 +1189,73 @@ export default function ChatPage() {
                   } else {
                     if (eSistema) avatarMsg = "🤖";
                     else if (eMinha) avatarMsg = meuAvatar;
-                    else avatarMsg = chatAtivoData?.amigoRef?.avatar || chatAtivoData?.icone || "🦆"; 
+                    else avatarMsg = chatAtivoData?.icone || "🦆";
                   }
 
                   return (
-                    <div key={msg.id} className={`message-wrapper ${eMinha && !eSistema ? 'is-mine' : eSistema ? 'is-system' : 'is-other'}`}>
-                      {!eMinha && !eSistema && (
-                        <div className="message-avatar" onClick={() => { if(!isLagoa && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
-                          {avatarMsg.startsWith("data:image/") ? <img src={avatarMsg} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover'}}/> : avatarMsg}
-                        </div>
-                      )}
-                      
-                      <div className="message-content">
-                        {!eSistema && (
-                          <span className="message-sender" onClick={() => { if(!isLagoa && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef) }}>
-                            {nomeLimpo}
-                          </span>
+                    <div key={msg.id} style={{ display: 'flex', gap: '12px', marginBottom: '12px', alignItems: 'flex-start' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#1a2830', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0, overflow: 'hidden' }}>
+                        {avatarMsg.startsWith("data:image/") ? (
+                          <img src={avatarMsg} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          avatarMsg
                         )}
-
-                        <div className="message-bubble">
-                          {msg.mensagem}
-                          {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "300px", borderRadius: "12px", marginTop: "8px", display: 'block', border: '1px solid rgba(255,255,255,0.1)' }} />}
-                          {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%", height: '36px', display: 'block', borderRadius: '18px' }} />}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                          <span style={{ fontWeight: 'bold', fontSize: '14px', color: eMinha ? '#2dd4bf' : '#fff' }}>{msg.usuario}</span>
+                          <span style={{ fontSize: '11px', color: '#64748b' }}>{msg.hora}</span>
+                          {eMinha && !eSistema && (
+                            <button onClick={() => apagarMensagem(msg.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', fontSize: '11px', cursor: 'pointer', marginLeft: 'auto' }}>
+                              🗑️
+                            </button>
+                          )}
                         </div>
-                        
-                        <div className="message-time">
-                          {msg.hora}
-                          {eMinha && !eSistema && <span className="delete-msg" onClick={() => apagarMensagem(msg.id)}>Excluir</span>}
+                        <div style={{ color: '#e2e8f0', fontSize: '14px', marginTop: '4px' }}>
+                          {msg.mensagem}
+                          {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "300px", borderRadius: "8px", marginTop: "8px", display: 'block' }} />}
+                          {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%", height: '36px', display: 'block' }} />}
                         </div>
                       </div>
-
-                      {eMinha && !eSistema && (
-                        <div className="message-avatar">
-                          {avatarMsg.startsWith("data:image/") ? <img src={avatarMsg} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover'}}/> : avatarMsg}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
                 <div ref={messagesEndRef} />
               </div>
+
+              <div style={{ padding: '16px', background: '#0b141a', borderTop: '1px solid #1f2d35', marginTop: 'auto' }}>
+                {imagemBase64 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#121e24', padding: '8px', borderRadius: '8px', marginBottom: '10px' }}>
+                    <img src={imagemBase64} alt="Preview" style={{ height: '40px', borderRadius: '4px' }} />
+                    <button onClick={() => setImagemBase64(null)} style={{ background: "none", border: "none", color: "#f43f5e", cursor: "pointer", marginLeft: "auto", fontWeight: 'bold' }}>✕ Remover Foto</button>
+                  </div>
+                )}
+                <form onSubmit={enviarMensagem} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  {!isLagoa && (
+                    <label style={{ cursor: 'pointer', fontSize: '20px', padding: '8px', background: '#121e24', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
+                    </label>
+                  )}
+                  <input type="text" placeholder={gravandoAudioMsg ? "Gravando áudio..." : "Conversar no Ninho..."} value={texto} onChange={(e) => setTexto(e.target.value)} disabled={gravandoAudioMsg} style={{ flex: 1, background: '#121e24', border: '1px solid #1f2d35', color: '#fff', padding: '14px 16px', borderRadius: '24px', outline: 'none', fontSize: '15px' }} />
+                  <button type="button" onClick={alternarGravacaoAudioMsg} style={{ background: gravandoAudioMsg ? 'rgba(244,63,94,0.2)' : '#121e24', border: gravandoAudioMsg ? '1px solid #f43f5e' : '1px solid #1f2d35', borderRadius: '50%', width: '46px', height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                    {gravandoAudioMsg ? "🛑" : "🎙️"}
+                  </button>
+                  <button type="submit" style={{ background: '#2dd4bf', color: '#000', border: 'none', borderRadius: '50%', width: '46px', height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', fontWeight: 'bold' }}>➤</button>
+                </form>
+              </div>
             </>
           )}
         </div>
-
-        {(isLagoa ? lagoaAtiva : true) && (
-          <div className="chat-input-container">
-            {imagemBase64 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '12px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <img src={imagemBase64} alt="Preview" style={{ height: '50px', borderRadius: '8px', objectFit: 'cover' }} />
-                <span style={{ fontSize: '13px', color: '#94a3b8', flex: 1 }}>Imagem anexada</span>
-                <button onClick={() => setImagemBase64(null)} style={{ background: "rgba(244,63,94,0.2)", border: "none", color: "#f43f5e", cursor: "pointer", fontWeight: 'bold', padding: '6px 12px', borderRadius: '6px' }}>Remover</button>
-              </div>
-            )}
-            
-            <form onSubmit={enviarMensagem} className="chat-input-wrapper">
-              {!isLagoa && (
-                <label className="btn-anexo" title="Anexar Imagem">
-                  📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
-                </label>
-              )}
-              
-              <input 
-                type="text" 
-                placeholder={gravandoAudioMsg ? "Gravando áudio... Fale agora!" : "Escreva uma mensagem..."} 
-                value={texto} 
-                onChange={(e) => setTexto(e.target.value)} 
-                disabled={gravandoAudioMsg} 
-                className="chat-input-field" 
-              />
-              
-              <button type="button" onClick={alternarGravacaoAudioMsg} className="btn-anexo" style={{ color: gravandoAudioMsg ? '#f43f5e' : '#94a3b8', background: gravandoAudioMsg ? 'rgba(244,63,94,0.1)' : 'transparent' }}>
-                {gravandoAudioMsg ? "🛑" : "🎙️"}
-              </button>
-              
-              <button type="submit" className="btn-enviar">➤</button>
-            </form>
-          </div>
-        )}
       </main>
 
       {/* MODAL DE PERFIL DO AMIGO */}
       {perfilAmigoSelecionado && (
-        <div onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(10px)', zIndex: 1000, padding: '16px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '24px', width: '100%', maxWidth: '360px', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 30px 60px rgba(0,0,0,0.8)' }}>
-            <div style={{ padding: '32px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, #0b141a 100%)', position: 'relative' }}>
-              <button onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'absolute', top: '16px', right: '20px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '32px', height: '32px', color: '#94a3b8', fontSize: '16px', cursor: 'pointer', transition: '0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✖</button>
+        <div onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '350px', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', background: 'linear-gradient(180deg, #12212b 0%, #0b141a 100%)' }}>
+              <button onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'absolute', top: '16px', right: '20px', background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer' }}>✖</button>
               
-              <div style={{ width: '110px', height: '110px', borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '50px', border: '4px solid #2dd4bf', overflow: 'hidden', boxShadow: '0 0 20px rgba(45,212,191,0.3)' }}>
+              <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#1a2830', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '50px', border: '3px solid #2dd4bf', overflow: 'hidden' }}>
                 {perfilAmigoSelecionado.avatar && perfilAmigoSelecionado.avatar.startsWith("data:image/") ? (
                   <img src={perfilAmigoSelecionado.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
@@ -1360,14 +1264,14 @@ export default function ChatPage() {
               </div>
               
               <div style={{ textAlign: 'center' }}>
-                <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '900', color: '#fff', letterSpacing: '0.5px' }}>{perfilAmigoSelecionado.name}</h2>
-                <span style={{ fontSize: '15px', color: '#2dd4bf', fontFamily: 'monospace', fontWeight: 'bold' }}>#{perfilAmigoSelecionado.tag}</span>
+                <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: '#fff' }}>{perfilAmigoSelecionado.name}</h2>
+                <span style={{ fontSize: '14px', color: '#2dd4bf', fontFamily: 'monospace', fontWeight: 'bold' }}>#{perfilAmigoSelecionado.tag}</span>
               </div>
 
-              <div style={{ background: 'rgba(15, 23, 42, 0.6)', width: '100%', padding: '20px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center', marginTop: '8px' }}>
-                <p style={{ margin: 0, color: '#e2e8f0', fontSize: '14px', fontStyle: 'italic', lineHeight: '1.5' }}>"{perfilAmigoSelecionado.bio || 'Mergulhando no lago...'}"</p>
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '1px' }}>
-                  IDENTIDADE: <span style={{ color: '#fff', marginLeft: '6px' }}>{perfilAmigoSelecionado.gender || 'Secreta'}</span>
+              <div style={{ background: '#121e24', width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid #1f2d35', textAlign: 'center' }}>
+                <p style={{ margin: 0, color: '#e2e8f0', fontSize: '14px', fontStyle: 'italic' }}>"{perfilAmigoSelecionado.bio || 'Mergulhando no lago...'}"</p>
+                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #1f2d35', fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                  IDENTIDADE: <span style={{ color: '#fff' }}>{perfilAmigoSelecionado.gender || 'Prefere não dizer'}</span>
                 </div>
               </div>
             </div>
@@ -1492,7 +1396,7 @@ export default function ChatPage() {
 
             </div>
             <div style={{ padding: '20px 24px', borderTop: '1px solid #1f2d35', background: '#080e12' }}>
-              <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', border: 'none', borderRadius: '12px', color: '#020d12', fontWeight: '900', cursor: 'pointer', fontSize: '15px' }}>
+              <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #2dd4bf, #10b981)', border: 'none', borderRadius: '12px', color: '#020d12', fontWeight: '900', cursor: 'pointer', fontSize: '15px' }}>
                 SALVAR E FECHAR 💾
               </button>
             </div>
@@ -1525,7 +1429,7 @@ export default function ChatPage() {
                   <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>Digite a Tag do pato. Ex: <strong>Pato#0000</strong></p>
                   <form onSubmit={enviarConviteAmizade} style={{ display: 'flex', gap: '8px' }}>
                     <input type="text" placeholder="Nome#Tag" value={amigoTagInput} onChange={(e) => setAmigoTagInput(e.target.value)} className="pro-input" required style={{ flex: 1 }} />
-                    <button type="submit" style={{ padding: '0 20px', background: 'linear-gradient(135deg, #0ea5e9, #2dd4bf)', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', color: '#020d12' }}>Enviar</button>
+                    <button type="submit" style={{ padding: '0 20px', background: '#2dd4bf', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', color: '#020d12' }}>Enviar</button>
                   </form>
                   {amigoMensagem && <div style={{ color: amigoMensagem.includes('✅') ? '#10b981' : '#f43f5e', fontSize: '14px', fontWeight: 'bold', textAlign: 'center', background: amigoMensagem.includes('✅') ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)', padding: '12px', borderRadius: '8px' }}>{amigoMensagem}</div>}
                 </div>
