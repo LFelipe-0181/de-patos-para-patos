@@ -116,7 +116,7 @@ app.prepare().then(() => {
 
     socket.on("enviar_mensagem", (data) => {
       const msgId = `msg_${Date.now()}`;
-      const hora = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const hora = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
       io.to(data.salaId).emit("receber_mensagem", {
         id: msgId,
         salaId: data.salaId,
