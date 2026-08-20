@@ -191,6 +191,7 @@ export default function ChatPage() {
                 mudou = true;
               } else {
                 novosPrivados[chatIndex].amigoRef = amigo;
+                novosPrivados[chatIndex].nomeCustom = amigo.name;
                 novosPrivados[chatIndex].icone = amigo.avatar || "🦆";
                 mudou = true;
               }
@@ -794,6 +795,7 @@ export default function ChatPage() {
   const isLagoa = abaAtiva === "lagoa";
   const chatAtivoData = privados.find(p => p.id === abaAtiva);
   const msgsAtuais = isLagoa ? lagoaMensagens : chatAtivoData?.mensagens || [];
+  const ehChatDeAmigo = Boolean(chatAtivoData?.amigoRef);
 
   return (
     <div className="app-layout">
@@ -965,7 +967,7 @@ export default function ChatPage() {
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <button className="hamburger-btn" onClick={() => setMenuAberto(true)}>☰</button>
             
-            {editandoNome === abaAtiva && !isLagoa ? (
+            {editandoNome === abaAtiva && !isLagoa && !ehChatDeAmigo ? (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <select 
                   value={chatAtivoData?.icone?.startsWith("data:image/") ? "🔒" : chatAtivoData?.icone || "🔒"}
@@ -1013,19 +1015,33 @@ export default function ChatPage() {
               >
                 {isLagoa ? "Mergulho Anônimo" : (
                   <>
-                    <span style={{ cursor: 'pointer' }} onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}>
+                    <span 
+                      style={{ cursor: chatAtivoData?.amigoRef ? 'pointer' : 'default' }} 
+                      onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}
+                    >
                       {chatAtivoData?.icone?.startsWith("data:image/") ? (
                         <img src={chatAtivoData.icone} alt="Icone Chat" style={{ width: '28px', height: '28px', borderRadius: '8px', objectFit: 'cover' }} />
                       ) : (
                         chatAtivoData?.icone || "🔒"
                       )}
                     </span>
-                    <span style={{ cursor: 'pointer' }} onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}>
+                    <span 
+                      style={{ cursor: chatAtivoData?.amigoRef ? 'pointer' : 'default' }} 
+                      onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}
+                    >
                       {chatAtivoData?.nomeCustom || "Ninho Privado"}
                     </span>
                   </>
                 )}
-                {!isLagoa && <span onClick={() => { setEditandoNome(abaAtiva); setNomePrivadoInput(chatAtivoData?.nomeCustom || `Ninho Privado`); }} style={{fontSize: '14px', marginLeft: '4px', opacity: 0.5, cursor: 'pointer'}} title="Editar Chat">✏️</span>}
+                {!isLagoa && !ehChatDeAmigo && (
+                  <span 
+                    onClick={() => { setEditandoNome(abaAtiva); setNomePrivadoInput(chatAtivoData?.nomeCustom || `Ninho Privado`); }} 
+                    style={{fontSize: '14px', marginLeft: '4px', opacity: 0.5, cursor: 'pointer'}} 
+                    title="Editar Chat"
+                  >
+                    ✏️
+                  </span>
+                )}
               </span>
             )}
           </div>
@@ -1186,7 +1202,6 @@ export default function ChatPage() {
 
               <div className="chat-messages" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
                 {msgsAtuais.map((msg) => {
-                  // 1. Limpa o nome caso ele tenha ficado gigante com código de imagem antigo
                   let nomeLimpo = msg.usuario;
                   if (nomeLimpo.includes("data:image")) {
                     const match = nomeLimpo.match(/([a-zA-Z0-9_ -]+#\d{4})/);
@@ -1197,7 +1212,6 @@ export default function ChatPage() {
 
                   const eSistema = nomeLimpo.includes("SISTEMA");
                   
-                  // 2. Identificação blindada: compara usando a TAG do usuário logado
                   const eMinha = !eSistema && (
                     isLagoa ? msg.usuario === meuNomeAnon : (nomeLimpo.includes(`#${minhaTag}`) || nomeLimpo.includes(meuNomeReal))
                   );
@@ -1208,7 +1222,7 @@ export default function ChatPage() {
                   } else {
                     if (eSistema) avatarMsg = "🤖";
                     else if (eMinha) avatarMsg = meuAvatar;
-                    else avatarMsg = chatAtivoData?.icone || "🦆";
+                    else avatarMsg = chatAtivoData?.amigoRef?.avatar || chatAtivoData?.icone || "🦆";
                   }
 
                   return (
@@ -1224,7 +1238,10 @@ export default function ChatPage() {
                       }}
                     >
                       {/* Avatar */}
-                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#1a2830', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0, overflow: 'hidden' }}>
+                      <div 
+                        onClick={() => { if(!eMinha && !isLagoa && !eSistema && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef); }}
+                        style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#1a2830', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0, overflow: 'hidden', cursor: !eMinha && chatAtivoData?.amigoRef ? 'pointer' : 'default' }}
+                      >
                         {avatarMsg.startsWith("data:image/") ? (
                           <img src={avatarMsg} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
@@ -1235,7 +1252,12 @@ export default function ChatPage() {
                       {/* Balão e Nome */}
                       <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '75%', alignItems: eMinha && !eSistema ? 'flex-end' : 'flex-start' }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '2px' }}>
-                          <span style={{ fontWeight: 'bold', fontSize: '13px', color: eMinha ? '#2dd4bf' : '#94a3b8' }}>{nomeLimpo}</span>
+                          <span 
+                            onClick={() => { if(!eMinha && !isLagoa && !eSistema && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef); }}
+                            style={{ fontWeight: 'bold', fontSize: '13px', color: eMinha ? '#2dd4bf' : '#fff', cursor: !eMinha && chatAtivoData?.amigoRef ? 'pointer' : 'default' }}
+                          >
+                            {nomeLimpo}
+                          </span>
                           <span style={{ fontSize: '10px', color: '#64748b' }}>{msg.hora}</span>
                         </div>
                         
@@ -1292,7 +1314,7 @@ export default function ChatPage() {
       {/* MODAL DE PERFIL DO AMIGO */}
       {perfilAmigoSelecionado && (
         <div onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '350px', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: '#0b141a', borderRadius: '20px', width: '100%', maxWidth: '350px', border: '1px solid #1f2d35', color: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)', position: 'relative' }}>
             <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', background: 'linear-gradient(180deg, #12212b 0%, #0b141a 100%)' }}>
               <button onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'absolute', top: '16px', right: '20px', background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '20px', cursor: 'pointer' }}>✖</button>
               
