@@ -34,24 +34,32 @@ app.prepare().then(() => {
       socket.join(novaSalaPrivada);
     });
 
-    // === NOVO SISTEMA DE MATCH MÚLTIPLO ===
+    // === NOVO SISTEMA DE MATCH (BLOQUEIA AMIGOS) ===
     socket.on("procurar_parceiro", (dadosFiltro) => {
       const meuGenero = dadosFiltro?.meuGenero || "prefiro-nao-dizer";
-      // Agora o servidor espera receber uma lista (Array) de preferências
       let minhasPreferencias = dadosFiltro?.preferencia || ["qualquer"];
+      
+      // 🦆 NOVO: Recebe sua identidade e quem são seus amigos
+      const meuEmail = dadosFiltro?.meuEmail || socket.id;
+      const amigosEmails = dadosFiltro?.amigosEmails || [];
 
       // Limpa o usuário da fila caso ele já tenha clicado antes
       filaEspera = filaEspera.filter(u => u.socket.id !== socket.id);
 
-      // Algoritmo Tinder dos Patos aprimorado (Match Duplo e Múltiplo)
+      // Algoritmo Tinder dos Patos aprimorado
       const indexParceiro = filaEspera.findIndex(esperando => {
-        // 1. Eu sirvo para o outro? (As preferências dele incluem 'qualquer' OU incluem o meu gênero atual?)
+        // 1. Eu sirvo para o outro?
         const sirvoPraEle = esperando.preferencias.includes("qualquer") || esperando.preferencias.includes(meuGenero);
         
-        // 2. O outro serve para mim? (Minhas preferências incluem 'qualquer' OU incluem o gênero atual dele?)
+        // 2. O outro serve para mim?
         const eleServePraMim = minhasPreferencias.includes("qualquer") || minhasPreferencias.includes(esperando.meuGenero);
         
-        return sirvoPraEle && eleServePraMim;
+        // 3. NOVO: Garante que ele não está na sua lista de amigos e você não está na dele
+        const eleEAmigo = amigosEmails.includes(esperando.meuEmail);
+        const euSouAmigoDele = esperando.amigosEmails.includes(meuEmail);
+        const naoSaoAmigos = !eleEAmigo && !euSouAmigoDele;
+        
+        return sirvoPraEle && eleServePraMim && naoSaoAmigos;
       });
 
       if (indexParceiro !== -1) {
@@ -67,8 +75,8 @@ app.prepare().then(() => {
         io.to(socket.id).emit("parceiro_encontrado", { salaId, meuNome: "Pato 1", parceiroNome: "Pato 2" });
         io.to(parceiro.socket.id).emit("parceiro_encontrado", { salaId, meuNome: "Pato 2", parceiroNome: "Pato 1" });
       } else {
-        // SEM MATCH: Vai pra fila aguardar alguém compatível
-        filaEspera.push({ socket, meuGenero, preferencias: minhasPreferencias });
+        // SEM MATCH: Vai pra fila aguardar alguém compatível (salvando também os dados de amizade)
+        filaEspera.push({ socket, meuGenero, preferencias: minhasPreferencias, meuEmail, amigosEmails });
         socket.emit("aguardando_parceiro");
       }
     });
