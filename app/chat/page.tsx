@@ -18,6 +18,7 @@ interface ChatPrivado {
   id: string;
   nomeCustom?: string;
   mensagens: Mensagem[];
+  naoLida?: boolean; // 🔴 NOVO: Propriedade para controlar a bolinha vermelha
 }
 
 export default function ChatPage() {
@@ -164,7 +165,8 @@ export default function ChatPage() {
                 novosPrivados.push({
                   id: roomId,
                   nomeCustom: amigo.name,
-                  mensagens: []
+                  mensagens: [],
+                  naoLida: false
                 });
                 mudou = true;
               }
@@ -226,6 +228,7 @@ export default function ChatPage() {
 
   const [lagoaPendente, setLagoaPendente] = useState<string | null>(null);
   const [lagoaAtiva, setLagoaAtiva] = useState<boolean>(false);
+  const [lagoaNaoLida, setLagoaNaoLida] = useState<boolean>(false); // 🔴 NOVO: Bolinha para a Lagoa
   const [procurando, setProcurando] = useState<boolean>(false);
   
   const [confirmados, setConfirmados] = useState<number>(0);
@@ -258,6 +261,8 @@ export default function ChatPage() {
     setAbaAtiva(roomId);
     setMenuAberto(false);
     setModalAmigosAberto(false);
+    // Limpa a notificação ao abrir
+    setPrivados(prev => prev.map(p => p.id === roomId ? { ...p, naoLida: false } : p));
   };
 
   const [texto, setTexto] = useState("");
@@ -442,7 +447,7 @@ export default function ChatPage() {
     socket.on("aguardando_parceiro", () => { setProcurando(true); setLagoaPendente(null); setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false); });
     socket.on("parceiro_encontrado", (data) => { setProcurando(false); setLagoaId(data.salaId); setLagoaPendente(data.salaId); setMeuNomeAnon(data.meuNome); setParceiroNomeAnon(data.parceiroNome); setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false); });
     socket.on("atualizar_confirmacao", (data) => setConfirmados(data.confirmados));
-    socket.on("conexao_confirmada", (data) => { setLagoaId(data.salaId); setLagoaAtiva(true); setLagoaPendente(null); setLagoaMensagens([]); setConfirmados(2); });
+    socket.on("conexao_confirmada", (data) => { setLagoaId(data.salaId); setLagoaAtiva(true); setLagoaPendente(null); setLagoaMensagens([]); setConfirmados(2); setLagoaNaoLida(false); });
     socket.on("tempo_esgotado", () => { alert("A lagoa fechou (6 min)!"); sairDaLagoa(); });
 
     socket.on("receber_mensagem", (data: Mensagem & { salaId: string }) => {
@@ -451,14 +456,19 @@ export default function ChatPage() {
       if (data.salaId.startsWith("ninho_")) {
         setPrivados((prev) => {
           const existe = prev.some(c => c.id === data.salaId);
+          // 🔴 NOVO: Verifica se o chat da mensagem é o que está ativo no momento
+          const ehAbaAtiva = data.salaId === abaAtivaRef.current;
+
           if (existe) {
-            return prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg] } : chat);
+            return prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg], naoLida: !ehAbaAtiva || chat.naoLida } : chat);
           } else {
-            return [...prev, { id: data.salaId, nomeCustom: "Novo Amigo", mensagens: [novaMsg] }];
+            return [...prev, { id: data.salaId, nomeCustom: "Novo Amigo", mensagens: [novaMsg], naoLida: !ehAbaAtiva }];
           }
         });
       } else { 
         setLagoaMensagens((prev) => [...prev, novaMsg]); 
+        // 🔴 NOVO: Se receber mensagem na lagoa e eu não estiver nela, acende a bolinha
+        if (abaAtivaRef.current !== "lagoa") setLagoaNaoLida(true);
       }
 
       const isSistema = data.usuario.includes("SISTEMA");
@@ -497,7 +507,6 @@ export default function ChatPage() {
     socket.on("webrtc_answer", async (data) => {
       if (peerConnectionRef.current) { 
         await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); 
-        // 👇 AQUI ESTAVA O BUG DO DATA.CANDIDATE. FOI CORRIGIDO PARA (C) 👇
         iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} });
         iceCandidatesQueue.current = [];
         setChamadaAtiva(true); 
@@ -526,13 +535,13 @@ export default function ChatPage() {
       socket.emit("entrar_sala_privada", { novaSalaPrivada: novaId });
       setPrivados((prev) => {
         if (prev.some(p => p.id === novaId)) return prev;
-        return [...prev, { id: novaId, mensagens: [{ id: `sys_${Date.now()}`, usuario: "SISTEMA 🔒", mensagem: `Vocês entraram em um Ninho Privado! Suas identidades foram reveladas.`, hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }] }];
+        return [...prev, { id: novaId, mensagens: [{ id: `sys_${Date.now()}`, usuario: "SISTEMA 🔒", mensagem: `Vocês entraram em um Ninho Privado! Suas identidades foram reveladas.`, hora: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }], naoLida: false }];
       });
-      setAbaAtiva(novaId); setLagoaAtiva(false); setConvitePendente(null); setStatusConvite(null);
+      setAbaAtiva(novaId); setLagoaAtiva(false); setConvitePendente(null); setStatusConvite(null); setLagoaNaoLida(false);
     });
 
     socket.on("convite_privado_recusado", () => { setStatusConvite("O pato recusou o convite."); setTimeout(() => setStatusConvite(null), 3000); });
-    socket.on("parceiro_desconectou", () => { pararRingtone(); setLagoaAtiva(false); setLagoaId(null); setLagoaPendente(null); setProcurando(false); setJaAceitou(false); setConfirmados(0); encerrarChamadaLocal(); });
+    socket.on("parceiro_desconectou", () => { pararRingtone(); setLagoaAtiva(false); setLagoaId(null); setLagoaPendente(null); setProcurando(false); setJaAceitou(false); setConfirmados(0); encerrarChamadaLocal(); setLagoaNaoLida(false); });
 
     return () => { pararRingtone(); if(testandoMic) alternarTesteMic(); socket.disconnect(); };
   }, []);
@@ -574,7 +583,7 @@ export default function ChatPage() {
   const sairDaLagoa = () => {
     socketRef.current?.emit("sair_da_lagoa");
     encerrarChamadaLocal();
-    setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null);
+    setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null); setLagoaNaoLida(false);
   };
 
   const solicitarChamadaVoz = () => {
@@ -738,6 +747,16 @@ export default function ChatPage() {
         .chat-item-title { font-weight: 700; font-size: 14px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chat-item-sub { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 
+        /* 🔴 NOVO: Estilo da bolinha de mensagem não lida */
+        .unread-dot {
+          width: 10px;
+          height: 10px;
+          background-color: #f43f5e;
+          border-radius: 50%;
+          box-shadow: 0 0 6px rgba(244, 63, 94, 0.8);
+          flex-shrink: 0;
+        }
+
         /* PAINEL DE LIGAÇÃO DISCORD */
         .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
         .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #fff; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5); margin-top: -5px; }
@@ -827,21 +846,26 @@ export default function ChatPage() {
 
         {/* LISTA DE CHATS ESTILIZADA */}
         <div className="chat-list">
-          <div className={`chat-item ${isLagoa ? "active" : ""}`} onClick={() => { setAbaAtiva("lagoa"); setMenuAberto(false); }}>
+          {/* 🔴 NOVO: Limpa a notificação ao clicar na Lagoa */}
+          <div className={`chat-item ${isLagoa ? "active" : ""}`} onClick={() => { setAbaAtiva("lagoa"); setMenuAberto(false); setLagoaNaoLida(false); }}>
             <div className="chat-item-avatar">🌊</div>
             <div className="chat-item-info">
               <span className="chat-item-title">Lagoa Pública</span>
               <span className="chat-item-sub">Mergulho Anônimo</span>
             </div>
+            {lagoaNaoLida && <div className="unread-dot"></div>}
           </div>
 
           {privados.map((chat, i) => (
-            <div key={chat.id} className={`chat-item ${abaAtiva === chat.id ? "active" : ""}`} onClick={() => { setAbaAtiva(chat.id); setMenuAberto(false); }}>
+            /* 🔴 NOVO: Limpa a notificação ao clicar em um Ninho Privado */
+            <div key={chat.id} className={`chat-item ${abaAtiva === chat.id ? "active" : ""}`} onClick={() => { setAbaAtiva(chat.id); setMenuAberto(false); setPrivados(prev => prev.map(p => p.id === chat.id ? { ...p, naoLida: false } : p)); }}>
               <div className="chat-item-avatar">🔒</div>
               <div className="chat-item-info">
                 <span className="chat-item-title">{chat.nomeCustom || `Ninho Privado ${i + 1}`}</span>
                 <span className="chat-item-sub">Bate-Papo Seguro</span>
               </div>
+              {/* 🔴 NOVO: Renderiza a bolinha vermelha se a propriedade naoLida for true */}
+              {chat.naoLida && <div className="unread-dot"></div>}
             </div>
           ))}
         </div>
@@ -1007,7 +1031,6 @@ export default function ChatPage() {
 
           {(isLagoa ? lagoaAtiva : true) && (
             <>
-              {/* 👇 CORREÇÃO: O STATUS VISUAL DA CHAMADA AGORA APARECE AQUI! 👇 */}
               {statusConvite && (
                 <div style={{ 
                   background: "rgba(6,24,33,0.9)", border: "1px solid #2dd4bf", color: "#fff", 
