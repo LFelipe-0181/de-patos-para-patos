@@ -364,7 +364,6 @@ export default function ChatPage() {
       localStorage.setItem("duckzone_ninhos_privados", JSON.stringify(privados));
     }
   }, [privados]);
-
   // ====== SOCKET E WEBRTC ======
   const obterOuCriarPeerConnection = () => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
@@ -373,26 +372,11 @@ export default function ChatPage() {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
-        // 👇 ADICIONE ESTES SERVIDORES TURN AQUI 👇
-        {
-          urls: "turn:openrelay.metered.ca:80",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        },
-        {
-          urls: "turn:openrelay.metered.ca:443?transport=tcp",
-          username: "openrelayproject",
-          credential: "openrelayproject"
-        }
+        { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
       ]
     });
-
-// ... o resto do código continua igualzinho para baixo
 
     pc.onicecandidate = (e) => {
       if (e.candidate) {
