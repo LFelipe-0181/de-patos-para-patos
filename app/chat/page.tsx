@@ -27,7 +27,6 @@ interface ChatPrivado {
 export default function ChatPage() {
   const { data: session } = useSession();
   
-  // TEMA
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const isDark = theme === "dark";
   const duckImgSrc = isDark ? "/pato-roxo.png" : "/pato-amarelo.png";
@@ -131,16 +130,7 @@ export default function ChatPage() {
     }
   };
 
-  useEffect(() => {
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.muted = audioMutado;
-      remoteAudioRef.current.volume = volumeSaida / 100;
-    }
-    if (testAudioRef.current) {
-      testAudioRef.current.volume = volumeSaida / 100;
-    }
-  }, [audioMutado, volumeSaida]);
-
+  // CORREÇÃO: Fallback Inteligente se o Banco de Dados falhar
   useEffect(() => {
     if (session?.user) {
       const email = session.user.email || `${session.user.name?.toLowerCase().replace(/\s+/g, '')}@duckzone.local`;
@@ -160,13 +150,13 @@ export default function ChatPage() {
             if (data.bio) setMeuStatusBio(data.bio);
             if (data.gender) setMeuGenero(data.gender);
           } else {
-            setMeuNomeReal("Pato Desconectado");
-            setMinhaTag("0000");
+            setMeuNomeReal(session?.user?.name || "Pato Logado");
+            setMinhaTag(session?.user?.email?.length.toString().padStart(4, '0') || "2629");
           }
         })
-        .catch((err) => {
-          setMeuNomeReal("Pato Offline");
-          setMinhaTag("0000");
+        .catch(() => {
+          setMeuNomeReal(session?.user?.name || "Pato Local");
+          setMinhaTag(session?.user?.email?.length.toString().padStart(4, '0') || "2629");
         });
     }
   }, [session]);
@@ -469,7 +459,6 @@ export default function ChatPage() {
     }
   }, [privados]);
 
-  // ====== SOCKET E WEBRTC ======
   const obterOuCriarPeerConnection = () => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
 
@@ -690,12 +679,19 @@ export default function ChatPage() {
     setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null); setLagoaNaoLida(false);
   };
 
+  // CORREÇÃO: Função de solicitar chamada segura
   const solicitarChamadaVoz = () => {
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
     if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
+    
     socketRef.current?.emit("iniciar_chamada_voz", { salaId: salaAlvo });
     setStatusConvite("Chamando... 📞");
-    tocarRingtone('chamando');
+    
+    try {
+      tocarRingtone('chamando');
+    } catch (e) {
+      console.warn("Ringtone error", e);
+    }
   };
 
   const recusarChamadaVoz = () => { 
@@ -1092,6 +1088,21 @@ export default function ChatPage() {
             {isLagoa && lagoaAtiva && <span onClick={sairDaLagoa} title="Sair" style={{color: '#f43f5e'}}>🚪</span>}
           </div>
         </header>
+
+        {/* CORREÇÃO: Status de Ligar/Chamada e Convites fora do container de rolagem pra nunca sumir */}
+        {((isLagoa && lagoaAtiva) || !isLagoa) && statusConvite && (
+          <div style={{ 
+            background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-main)", 
+            padding: "12px 20px", textAlign: "center", borderRadius: "10px", margin: "16px 24px 0",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
+          }}>
+            <span style={{ fontWeight: 'bold' }}>{statusConvite}</span>
+            {!isLagoa && statusConvite.includes("Chamando") && (
+               <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>Cancelar ✖</button>
+            )}
+          </div>
+        )}
 
         {isLagoa && !lagoaAtiva && !procurando && !lagoaPendente && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>

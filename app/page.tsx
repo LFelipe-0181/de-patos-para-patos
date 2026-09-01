@@ -5,7 +5,8 @@ import { useState } from "react";
 import "./theme.css";
 
 export default function Home() {
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  // FORÇANDO TEMA CLARO NO INÍCIO
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [telaAtiva, setTelaAtiva] = useState<"intro" | "auth">("intro");
   const [isLogin, setIsLogin] = useState(true);
   

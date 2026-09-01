@@ -1,5 +1,5 @@
 :root {
-  /* ☀️ TEMA CLARO - FIEL ÀS REFERÊNCIAS */
+  /* ☀️ TEMA CLARO */
   --bg-gradient: linear-gradient(180deg, #C7E3FF 0%, #EFEFEF 100%);
   --bg-card: #EFEFEF;
   --bg-input: #ffffff;
@@ -11,7 +11,6 @@
   --text-muted: #4a5c75;
   --border-color: #0F337B;
   
-  /* Chat Claro */
   --chat-header-bg: transparent;
   --bubble-me: #ffffff;
   --bubble-other: #e2e8f0;
@@ -21,23 +20,22 @@
 }
 
 [data-theme="dark"] {
-  /* 🌙 TEMA ESCURO - FIEL ÀS REFERÊNCIAS */
+  /* 🌙 TEMA ESCURO (CORRIGIDO: Suave e elegante) */
   --bg-gradient: linear-gradient(180deg, #0A1D44 0%, #5D0269 100%);
-  --bg-card: #b794d4;
-  --bg-input: #ffffff;
+  --bg-card: #1E1A2F; 
+  --bg-input: #2A243D;
   
   --btn-blue-grad: linear-gradient(90deg, #5D0269 0%, #2a0130 100%);
   --btn-gold-grad: linear-gradient(90deg, #FECF02 0%, #D68E13 100%);
   
-  --text-main: #0F337B;
-  --text-muted: #3a4a63;
-  --border-color: #ffffff;
+  --text-main: #E2E8F0; /* BRANCO SUAVE (Não agride os olhos) */
+  --text-muted: #94A3B8;
+  --border-color: #4A446A;
   
-  /* Chat Escuro */
   --chat-header-bg: transparent;
-  --bubble-me: #ffffff;
-  --bubble-other: #d1d5db;
-  --chat-glow: 0px 0px 20px rgba(255, 255, 255, 0.75);
+  --bubble-me: #3D355C;
+  --bubble-other: #2A243D;
+  --chat-glow: 0px 0px 20px rgba(255, 255, 255, 0.08);
   --icon-color: #C7E3FF;
   --chat-input-bar-bg: transparent;
 }
