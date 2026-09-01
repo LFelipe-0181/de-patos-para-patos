@@ -839,14 +839,14 @@ export default function ChatPage() {
         ::-webkit-scrollbar-thumb:hover { background: var(--icon-color); }
         * { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, 0.2) transparent; }
 
-        .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-gradient); color: var(--text-main); font-family: -apple-system, sans-serif; }
+        .app-layout { display: flex; flex-direction: row; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-gradient); color: var(--text-main); font-family: -apple-system, sans-serif; }
         
         .chat-icon-rail { width: 68px; background-color: rgba(0, 0, 0, 0.08); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 16px; z-index: 20; flex-shrink: 0; }
         .rail-btn { width: 46px; height: 46px; border-radius: 14px; border: 1px solid var(--border-color); background-color: var(--bg-input); color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; transition: all 0.2s; }
         .rail-btn.active { background: var(--btn-blue-grad); color: #fff; border-color: transparent; }
         .rail-btn-duck { width: 28px; height: 28px; object-fit: contain; }
         
-        .chat-sidebar { width: 340px; background-color: rgba(255, 255, 255, 0.2); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s; z-index: 15; backdrop-filter: blur(5px); }
+        .chat-sidebar { width: 340px; background-color: rgba(255, 255, 255, 0.2); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s ease; z-index: 15; backdrop-filter: blur(5px); flex-shrink: 0; }
         .sidebar-header-area { padding: 20px 16px 10px; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin: 0; }
         .sidebar-scroll { flex: 1; overflow-y: auto; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 8px; }
@@ -907,20 +907,69 @@ export default function ChatPage() {
         
         .search-spinner { 
           width: 60px; height: 60px; 
-          border: 4px solid var(--border-color); 
-          border-top-color: transparent; 
+          border: 5px solid var(--border-color); 
+          border-top-color: transparent !important; 
           border-radius: 50%; 
           animation: spin 1s linear infinite; 
           margin: 0 auto 20px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* ========================================= */
+        /* 📱 MOBILE RESPONSIVE (BOTTOM NAV BAR) 📱 */
+        /* ========================================= */
         @media (max-width: 768px) {
-          .chat-sidebar { position: absolute; left: 68px; height: 100%; transform: translateX(-100%); width: calc(100% - 68px); background: var(--bg-gradient); box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
-          .chat-sidebar.open { transform: translateX(0); }
+          .app-layout { 
+            flex-direction: column; 
+          }
+          .chat-icon-rail {
+            width: 100%;
+            height: 64px;
+            flex-direction: row;
+            border-right: none;
+            border-top: 1px solid var(--border-color);
+            padding: 0;
+            justify-content: space-evenly;
+            order: 3;
+            background: var(--bg-card);
+          }
+          .chat-main-area {
+            height: calc(100vh - 64px);
+            width: 100%;
+            order: 1;
+          }
+          .chat-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: calc(100vh - 64px);
+            width: 85vw;
+            max-width: 320px;
+            transform: translateX(-100%);
+            z-index: 95;
+            background: var(--bg-gradient);
+            box-shadow: 5px 0 25px rgba(0,0,0,0.5);
+          }
+          .chat-sidebar.open {
+            transform: translateX(0);
+          }
           .hamburger-btn { display: block; }
-          .menu-overlay.open { display: block; }
-          .main-chat-area { width: 100%; }
+          .menu-overlay.open { display: block; z-index: 90; }
+          
+          .chat-bubble-wrapper:hover .msg-dots-btn,
+          .msg-dots-btn {
+            opacity: 1; 
+          }
+          
+          .lagoa-card-container {
+            padding: 40px 16px 20px;
+            margin-top: 30px;
+            max-width: 90%;
+          }
+          .lagoa-btn {
+            font-size: 12px;
+            padding: 10px 4px;
+          }
         }
       `}} />
 
