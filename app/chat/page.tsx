@@ -839,7 +839,8 @@ export default function ChatPage() {
         ::-webkit-scrollbar-thumb:hover { background: var(--icon-color); }
         * { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, 0.2) transparent; }
 
-        .app-layout { display: flex; flex-direction: row; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-gradient); color: var(--text-main); font-family: -apple-system, sans-serif; }
+        /* ✅ 100dvh para funcionar bem nos navegadores mobile e não esconder a barra de baixo */
+        .app-layout { display: flex; flex-direction: row; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; background: var(--bg-gradient); color: var(--text-main); font-family: -apple-system, sans-serif; }
         
         .chat-icon-rail { width: 68px; background-color: rgba(0, 0, 0, 0.08); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 16px; z-index: 20; flex-shrink: 0; }
         .rail-btn { width: 46px; height: 46px; border-radius: 14px; border: 1px solid var(--border-color); background-color: var(--bg-input); color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; transition: all 0.2s; }
@@ -848,7 +849,6 @@ export default function ChatPage() {
         
         .chat-sidebar { width: 340px; background-color: rgba(255, 255, 255, 0.2); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s ease; z-index: 15; backdrop-filter: blur(5px); flex-shrink: 0; }
         
-        /* 🦆 CABEÇALHO DO MENU LATERAL E BOTÃO DE FECHAR 🦆 */
         .sidebar-header-area { padding: 20px 16px 10px; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin: 0; }
         .sidebar-close-btn { display: none; background: transparent; border: none; color: var(--text-main); font-size: 24px; cursor: pointer; padding: 0; line-height: 1; opacity: 0.7; }
@@ -920,35 +920,45 @@ export default function ChatPage() {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* ========================================= */
+        /* 📱 MOBILE RESPONSIVE (BOTTOM NAV BAR) 📱 */
+        /* ========================================= */
         @media (max-width: 768px) {
           .app-layout { 
-            flex-direction: column; 
+            display: block; 
           }
           .chat-icon-rail {
+            position: fixed;
+            bottom: 0;
+            left: 0;
             width: 100%;
-            height: 64px;
+            height: 60px;
             flex-direction: row;
             border-right: none;
             border-top: 1px solid var(--border-color);
             padding: 0;
             justify-content: space-evenly;
-            order: 3;
             background: var(--bg-card);
+            z-index: 100;
           }
           .chat-main-area {
-            height: calc(100vh - 64px);
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100dvh;
             width: 100%;
-            order: 1;
+            padding-bottom: 60px;
+            box-sizing: border-box;
           }
           .chat-sidebar {
             position: fixed;
             top: 0;
             left: 0;
-            height: calc(100vh - 64px);
+            height: calc(100dvh - 60px);
             width: 85vw;
             max-width: 320px;
             transform: translateX(-100%);
-            z-index: 95;
+            z-index: 105;
             background: var(--bg-gradient);
             box-shadow: 5px 0 25px rgba(0,0,0,0.5);
           }
@@ -956,7 +966,7 @@ export default function ChatPage() {
             transform: translateX(0);
           }
           .hamburger-btn { display: block; }
-          .menu-overlay.open { display: block; z-index: 90; }
+          .menu-overlay.open { display: block; z-index: 100; }
           .sidebar-close-btn { display: block; }
           
           .chat-bubble-wrapper:hover .msg-dots-btn,
@@ -1017,7 +1027,6 @@ export default function ChatPage() {
             </div>
             
             <div className="sidebar-scroll">
-              {/* 🦆 MENU DE PÍLULAS ESTILIZADO 🦆 */}
               <div style={{ display: 'flex', backgroundColor: 'var(--bg-input)', padding: '6px', borderRadius: '16px', marginBottom: '20px', border: '1px solid var(--border-color)', gap: '4px' }}>
                 <button onClick={() => setAbaAmigos('add')} style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', background: abaAmigos === 'add' ? 'var(--btn-blue-grad)' : 'transparent', color: abaAmigos === 'add' ? '#fff' : 'var(--text-main)', transition: '0.2s' }}>Add</button>
                 <button onClick={() => setAbaAmigos('pending')} style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', background: abaAmigos === 'pending' ? 'var(--btn-blue-grad)' : 'transparent', color: abaAmigos === 'pending' ? '#fff' : 'var(--text-main)', transition: '0.2s' }}>Pendentes</button>
