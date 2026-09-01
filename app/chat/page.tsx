@@ -60,8 +60,6 @@ export default function ChatPage() {
   const [meuIdBanco, setMeuIdBanco] = useState<string>("");
 
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
-
-  // NOVO: Controle do menu de 3 pontinhos das mensagens
   const [menuMensagemAberto, setMenuMensagemAberto] = useState<string | null>(null);
 
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
@@ -858,19 +856,22 @@ export default function ChatPage() {
         .chat-messages { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
         .chat-bubble { padding: 10px 14px; font-size: 14px; box-shadow: var(--chat-glow); line-height: 1.45; word-break: break-word; }
         
-        /* 🦆 NOVO: ESTILOS DO MENU DE 3 PONTINHOS DAS MENSAGENS 🦆 */
+        /* 🦆 MENU DE OPÇÕES (3 PONTINHOS) CORRIGIDO 🦆 */
         .chat-bubble-wrapper { display: flex; gap: 12px; align-items: flex-end; width: 100%; position: relative; }
         .msg-options-container { position: relative; display: flex; align-items: center; justify-content: center; }
         .msg-dots-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 4px; opacity: 0; transition: opacity 0.2s ease; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
         .chat-bubble-wrapper:hover .msg-dots-btn { opacity: 1; }
         .msg-dots-btn:hover { background: rgba(0,0,0,0.1); color: var(--text-main); }
-        .msg-dropdown { position: absolute; top: 100%; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 50; display: flex; flex-direction: column; min-width: 140px; overflow: hidden; padding: 4px 0; }
+        
+        /* Ajuste crucial: bottom: 0 força o menu a abrir para cima, nunca será cortado */
+        .msg-dropdown { position: absolute; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; display: flex; flex-direction: column; min-width: 140px; overflow: hidden; padding: 6px 0; }
         .msg-dropdown-btn { background: transparent; border: none; padding: 10px 16px; text-align: left; color: var(--text-main); font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; gap: 8px; align-items: center; }
         .msg-dropdown-btn:hover { background: var(--bg-input); }
         .msg-dropdown-btn.danger { color: #f43f5e; }
 
-        .chat-input-area { padding: 20px 24px; background: transparent; }
-        .chat-input-bar { display: flex; align-items: center; border: 1.5px solid var(--border-color); border-radius: 99px; padding: 10px 18px; background: var(--chat-input-bar-bg); }
+        /* 🦆 CAIXA DE TEXTO (INPUT) CORRIGIDA (Max width centralizado) 🦆 */
+        .chat-input-area { padding: 16px 24px; background: transparent; display: flex; flex-direction: column; align-items: center; }
+        .chat-input-bar { width: 100%; max-width: 800px; display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 99px; padding: 12px 20px; background: var(--bg-input); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         .chat-input-bar input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-main); margin-left: 12px; font-size: 15px; }
         
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
@@ -1054,7 +1055,6 @@ export default function ChatPage() {
           </div>
         </header>
 
-        {/* ✅ AVISO DE CHAMADA FLUTUANTE */}
         {((isLagoa && lagoaAtiva) || !isLagoa) && statusConvite && (
           <div style={{ 
             position: 'absolute', top: '80px', left: '50%', transform: 'translateX(-50%)',
@@ -1178,7 +1178,6 @@ export default function ChatPage() {
                 justifyContent: eSistema ? 'center' : 'flex-start' 
               }}>
                 
-                {/* ✅ O SEU AVATAR AGORA APARECE AQUI */}
                 {!eSistema && (
                   <div 
                     onClick={() => { if(!eMinha && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef); }}
@@ -1196,16 +1195,14 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                {/* CORPO DA MENSAGEM E MENU DE OPÇÕES */}
                 <div style={{ display: 'flex', flexDirection: eMinha ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', maxWidth: '75%' }}>
                   
-                  {/* BALÃO */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: eMinha && !eSistema ? 'flex-end' : 'flex-start' }}>
                     {!eMinha && !eSistema && <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', opacity: 0.7 }}>{nomeLimpo}</div>}
                     
                     <div className={`chat-bubble ${eMinha ? 'me' : 'other'}`} style={{ 
                       background: eSistema ? 'var(--bg-input)' : (eMinha ? 'var(--bubble-me)' : 'var(--bubble-other)'), 
-                      color: eSistema ? 'var(--text-main)' : (eMinha ? (isDark ? '#fff' : 'var(--text-main)') : 'var(--text-main)'), 
+                      color: eSistema ? 'var(--text-main)' : (eMinha ? (isDark ? '#000' : 'var(--text-main)') : 'var(--text-main)'), 
                       borderRadius: eMinha ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
                       border: eSistema ? '1px solid var(--border-color)' : '' 
                     }}>
@@ -1216,13 +1213,12 @@ export default function ChatPage() {
                     </div>
                   </div>
 
-                  {/* ✅ OS 3 PONTINHOS E O DROPDOWN AQUI */}
                   {!eSistema && (
                     <div className="msg-options-container" onClick={(e) => e.stopPropagation()}>
                       <button className="msg-dots-btn" onClick={() => setMenuMensagemAberto(menuMensagemAberto === msg.id ? null : msg.id)}>⋮</button>
                       
                       {menuMensagemAberto === msg.id && (
-                        <div className="msg-dropdown" style={eMinha ? { right: '100%', marginRight: '8px' } : { left: '100%', marginLeft: '8px' }}>
+                        <div className="msg-dropdown" style={eMinha ? { right: '100%', marginRight: '8px', bottom: '0' } : { left: '100%', marginLeft: '8px', bottom: '0' }}>
                           
                           <button className="msg-dropdown-btn" onClick={() => { 
                             setTexto(`Respondendo ${nomeLimpo}: `); 
@@ -1265,9 +1261,9 @@ export default function ChatPage() {
         {((isLagoa && lagoaAtiva) || !isLagoa) && (
           <div className="chat-input-area">
             {imagemBase64 && (
-              <div style={{display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px', borderRadius: '12px', marginBottom: '8px', border: '1px solid var(--border-color)'}}>
-                <img src={imagemBase64} style={{height: '40px', borderRadius: '4px'}} />
-                <span onClick={() => setImagemBase64(null)} style={{cursor: 'pointer', color: '#f43f5e', fontWeight: 'bold', marginLeft: 'auto'}}>✕ Remover</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px 16px', borderRadius: '16px', marginBottom: '12px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '800px' }}>
+                <img src={imagemBase64} style={{ height: '40px', borderRadius: '4px' }} />
+                <span onClick={() => setImagemBase64(null)} style={{ cursor: 'pointer', color: '#f43f5e', fontWeight: 'bold', marginLeft: 'auto' }}>✕ Remover Foto</span>
               </div>
             )}
             <form onSubmit={enviarMensagem} className="chat-input-bar">
