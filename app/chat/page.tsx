@@ -7,110 +7,164 @@ import Link from "next/link";
 import "../theme.css";
 
 interface Mensagem {
-  id: string; usuario: string; mensagem: string; imagem?: string | null; audio?: string | null; hora: string;
+  id: string;
+  usuario: string;
+  mensagem: string;
+  imagem?: string | null;
+  audio?: string | null;
+  hora: string;
 }
 
 interface ChatPrivado {
-  id: string; nomeCustom?: string; mensagens: Mensagem[]; naoLida?: boolean; icone?: string; amigoRef?: any; 
+  id: string;
+  nomeCustom?: string;
+  mensagens: Mensagem[];
+  naoLida?: boolean;
+  icone?: string; 
+  amigoRef?: any; 
 }
 
 export default function ChatPage() {
   const { data: session } = useSession();
+  
+  // TEMA
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const isDark = theme === "dark";
-  const duckImgSrc = isDark ? "/pato-roxo.png" : "/pato-amarelo.png";
-  const lagoImgSrc = isDark ? "/lago-dark.png" : "/lago-claro.png";
-
-  const [abaChat, setAbaChat] = useState<"grupos" | "amigos" | "config">("grupos");
   
-  // Perfil state
   const [meuNomeReal, setMeuNomeReal] = useState<string>("");
   const [minhaTag, setMinhaTag] = useState<string>("....");
   const [meuStatusBio, setMeuStatusBio] = useState<string>("Nadando nas águas profundas...");
   const [meuAvatar, setMeuAvatar] = useState<string>("🦆");
+  
   const [meuGenero, setMeuGenero] = useState<string>("prefiro-nao-dizer");
+  // CORREÇÃO: Variável declarada corretamente
+  const isGeneroSecreto = meuGenero === "prefiro-nao-dizer" || meuGenero === "Prefiro não informar";
   const [preferenciasGenero, setPreferenciasGenero] = useState<string[]>(["qualquer"]);
   
-  // Settings & Navigation
   const [abaConfig, setAbaConfig] = useState<'perfil' | 'audio' | 'notificacoes'>('perfil');
   const [permiteNotificacoes, setPermiteNotificacoes] = useState<boolean>(false);
   const permiteNotificacoesRef = useRef<boolean>(false);
+  
+  const [modalPerfilAberto, setModalPerfilAberto] = useState<boolean>(false);
   const [perfilAmigoSelecionado, setPerfilAmigoSelecionado] = useState<any | null>(null); 
-  const [abaAmigos, setAbaAmigos] = useState<'add' | 'pending' | 'list'>('add');
+  
+  const [modalAmigosAberto, setModalAmigosAberto] = useState<boolean>(false);
   const [amigoTagInput, setAmigoTagInput] = useState<string>("");
   const [amigoMensagem, setAmigoMensagem] = useState<string>("");
+  
+  const [abaAmigos, setAbaAmigos] = useState<'add' | 'pending' | 'list'>('add');
   const [listaPendentes, setListaPendentes] = useState<any[]>([]);
   const [listaAmigosAceitos, setListaAmigosAceitos] = useState<any[]>([]);
   const [meuIdBanco, setMeuIdBanco] = useState<string>("");
+
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
 
-  // Audio & WebRTC
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
   const [ganhoMicrofone, setGanhoMicrofone] = useState<number>(100);
   const ganhoMicrofoneRef = useRef<number>(100);
+  useEffect(() => { ganhoMicrofoneRef.current = ganhoMicrofone; }, [ganhoMicrofone]);
+  
   const micGainNodeRef = useRef<GainNode | null>(null);
   const micAudioCtxRef = useRef<AudioContext | null>(null);
+  
+  useEffect(() => {
+    if (micGainNodeRef.current) {
+      micGainNodeRef.current.gain.value = ganhoMicrofone / 100;
+    }
+  }, [ganhoMicrofone]);
+
   const [microfoneMutado, setMicrofoneMutado] = useState<boolean>(false);
   const [audioMutado, setAudioMutado] = useState<boolean>(false);
   const [testandoMic, setTestandoMic] = useState<boolean>(false);
+  
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const testAudioRef = useRef<HTMLAudioElement | null>(null);
   const testStreamRef = useRef<MediaStream | null>(null);
   const iceCandidatesQueue = useRef<RTCIceCandidateInit[]>([]);
+
   const [tempoRestante, setTempoRestante] = useState<number | null>(null);
 
-  useEffect(() => { ganhoMicrofoneRef.current = ganhoMicrofone; }, [ganhoMicrofone]);
-  useEffect(() => { if (micGainNodeRef.current) micGainNodeRef.current.gain.value = ganhoMicrofone / 100; }, [ganhoMicrofone]);
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const salva = localStorage.getItem('duckzone_notificacoes') === 'true';
       if (salva && Notification.permission === "granted") {
-        setPermiteNotificacoes(true); permiteNotificacoesRef.current = true;
+        setPermiteNotificacoes(true);
+        permiteNotificacoesRef.current = true;
       }
     }
   }, []);
 
   const handleToggleNotificacoes = async () => {
     if (!permiteNotificacoes) {
-      if (!("Notification" in window)) { alert("Este navegador não suporta notificações."); return; }
+      if (!("Notification" in window)) {
+        alert("Este navegador não suporta notificações de área de trabalho.");
+        return;
+      }
       const permission = await Notification.requestPermission();
       if (permission === "granted") {
-        setPermiteNotificacoes(true); permiteNotificacoesRef.current = true;
+        setPermiteNotificacoes(true);
+        permiteNotificacoesRef.current = true;
         localStorage.setItem('duckzone_notificacoes', 'true');
         new Notification("DuckZone", { body: "Notificações ativadas com sucesso! 🦆" });
+      } else {
+        alert("Você precisa permitir as notificações no navegador para ativar essa função.");
       }
     } else {
-      setPermiteNotificacoes(false); permiteNotificacoesRef.current = false;
+      setPermiteNotificacoes(false);
+      permiteNotificacoesRef.current = false;
       localStorage.setItem('duckzone_notificacoes', 'false');
     }
   };
 
   const dispararNotificacao = (titulo: string, corpo: string) => {
     if (permiteNotificacoesRef.current && "Notification" in window && Notification.permission === "granted") {
-      if (document.hidden) new Notification(titulo, { body: corpo, icon: "🦆" });
+      if (document.hidden) {
+        new Notification(titulo, { body: corpo, icon: "🦆" });
+      }
     }
   };
 
   useEffect(() => {
-    if (remoteAudioRef.current) { remoteAudioRef.current.muted = audioMutado; remoteAudioRef.current.volume = volumeSaida / 100; }
-    if (testAudioRef.current) testAudioRef.current.volume = volumeSaida / 100;
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = audioMutado;
+      remoteAudioRef.current.volume = volumeSaida / 100;
+    }
+    if (testAudioRef.current) {
+      testAudioRef.current.volume = volumeSaida / 100;
+    }
   }, [audioMutado, volumeSaida]);
 
   useEffect(() => {
     if (session?.user) {
       const email = session.user.email || `${session.user.name?.toLowerCase().replace(/\s+/g, '')}@duckzone.local`;
       const name = session.user.name || "Pato Verificado";
-      fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email }) })
+
+      fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email }),
+      })
         .then(async (res) => {
           const data = await res.json();
           if (res.ok && !data.error) {
-            setMeuNomeReal(data.name); setMinhaTag(data.tag || "2629");
+            setMeuNomeReal(data.name);
+            setMinhaTag(data.tag || "2629");
             if (data.avatar) setMeuAvatar(data.avatar);
             if (data.bio) setMeuStatusBio(data.bio);
             if (data.gender) setMeuGenero(data.gender);
+          } else {
+            setMeuNomeReal(`ERRO: ${data.error || 'Desconhecido'}`);
+            setMinhaTag("0000");
           }
-        }).catch(() => { setMinhaTag("0000"); });
+        })
+        .catch((err) => {
+          setMeuNomeReal(`FALHA: ${err.message}`);
+          setMinhaTag("0000");
+        });
     }
   }, [session]);
 
@@ -120,46 +174,78 @@ export default function ChatPage() {
       const res = await fetch(`/api/friends?email=${session.user.email}`);
       const data = await res.json();
       if (res.ok) {
-        setListaPendentes(data.pendentes || []); setListaAmigosAceitos(data.amigos || []); setMeuIdBanco(data.myId);
+        setListaPendentes(data.pendentes || []);
+        setListaAmigosAceitos(data.amigos || []);
+        setMeuIdBanco(data.myId);
+
         const amigos = data.amigos || [];
         if (amigos.length > 0) {
           setPrivados((prev) => {
-            const novosPrivados = [...prev]; let mudou = false;
+            const novosPrivados = [...prev];
+            let mudou = false;
+
             amigos.forEach((amizade: any) => {
               const roomId = `ninho_friend_${amizade.id}`;
               const amigo = amizade.senderId === data.myId ? amizade.receiver : amizade.sender;
+              
               const chatIndex = novosPrivados.findIndex(p => p.id === roomId);
+
               if (chatIndex === -1) {
-                novosPrivados.push({ id: roomId, nomeCustom: amigo.name, mensagens: [], naoLida: false, icone: amigo.avatar || "🦆", amigoRef: amigo });
+                novosPrivados.push({
+                  id: roomId,
+                  nomeCustom: amigo.name,
+                  mensagens: [],
+                  naoLida: false,
+                  icone: amigo.avatar || "🦆", 
+                  amigoRef: amigo 
+                });
                 mudou = true;
               } else {
-                novosPrivados[chatIndex].amigoRef = amigo; novosPrivados[chatIndex].nomeCustom = amigo.name; novosPrivados[chatIndex].icone = amigo.avatar || "🦆"; mudou = true;
+                novosPrivados[chatIndex].amigoRef = amigo;
+                novosPrivados[chatIndex].nomeCustom = amigo.name;
+                novosPrivados[chatIndex].icone = amigo.avatar || "🦆";
+                mudou = true;
               }
               socketRef.current?.emit("entrar_sala_privada", { novaSalaPrivada: roomId });
             });
+
             return mudou ? novosPrivados : prev;
           });
         }
       }
-    } catch (e) {}
+    } catch (e) { console.error(e); }
   };
 
-  useEffect(() => { if (session?.user?.email) buscarAmigos(); }, [session, abaAmigos]);
+  useEffect(() => {
+    if (session?.user?.email) {
+      buscarAmigos();
+    }
+  }, [session, modalAmigosAberto, abaAmigos]);
 
   const enviarConviteAmizade = async (e: React.FormEvent) => {
-    e.preventDefault(); setAmigoMensagem("Enviando convite... ⏳");
+    e.preventDefault();
+    setAmigoMensagem("Enviando convite... ⏳");
     try {
-      const res = await fetch('/api/friends', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ senderEmail: session?.user?.email, targetTagString: amigoTagInput }) });
+      const res = await fetch('/api/friends', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senderEmail: session?.user?.email, targetTagString: amigoTagInput })
+      });
       const data = await res.json();
-      if (res.ok) { setAmigoMensagem(`✅ ${data.message}`); setAmigoTagInput(""); } else setAmigoMensagem(`❌ ${data.error}`);
-    } catch (err) { setAmigoMensagem("❌ Erro no servidor."); }
+      if (res.ok) { setAmigoMensagem(`✅ ${data.message}`); setAmigoTagInput(""); } 
+      else { setAmigoMensagem(`❌ ${data.error}`); }
+    } catch (err) { setAmigoMensagem("❌ Erro ao conectar com o servidor."); }
   };
 
   const responderConviteAmizade = async (id: string, action: 'ACCEPT' | 'REJECT') => {
     try {
-      await fetch('/api/friends', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ friendshipId: id, action }) });
-      buscarAmigos();
-    } catch (e) {}
+      await fetch('/api/friends', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ friendshipId: id, action })
+      });
+      buscarAmigos(); 
+    } catch (e) { console.error(e); }
   };
 
   const socketRef = useRef<Socket | null>(null);
@@ -180,13 +266,17 @@ export default function ChatPage() {
   const [lagoaAtiva, setLagoaAtiva] = useState<boolean>(false);
   const [lagoaNaoLida, setLagoaNaoLida] = useState<boolean>(false);
   const [procurando, setProcurando] = useState<boolean>(false);
+  
   const [confirmados, setConfirmados] = useState<number>(0);
   const [jaAceitou, setJaAceitou] = useState<boolean>(false);
+
   const [meuNomeAnon, setMeuNomeAnon] = useState<string>("");
   const [parceiroNomeAnon, setParceiroNomeAnon] = useState<string>("");
+  
   const [lagoaMensagens, setLagoaMensagens] = useState<Mensagem[]>([]);
   const [convitePendente, setConvitePendente] = useState<string | null>(null);
   const [statusConvite, setStatusConvite] = useState<string | null>(null);
+
   const [chamadaAtiva, setChamadaAtiva] = useState<boolean>(false);
   const [chamadaRecebida, setChamadaRecebida] = useState<boolean>(false);
 
@@ -204,13 +294,16 @@ export default function ChatPage() {
 
   const iniciarChatComAmigo = (amizadeId: string) => {
     const roomId = `ninho_friend_${amizadeId}`; 
-    setAbaAtiva(roomId); setMenuAberto(false);
+    setAbaAtiva(roomId);
+    setMenuAberto(false);
+    setModalAmigosAberto(false);
     setPrivados(prev => prev.map(p => p.id === roomId ? { ...p, naoLida: false } : p));
   };
 
   const [texto, setTexto] = useState("");
   const [imagemBase64, setImagemBase64] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const [editandoNome, setEditandoNome] = useState<string | null>(null);
   const [nomePrivadoInput, setNomePrivadoInput] = useState<string>("");
 
@@ -218,45 +311,152 @@ export default function ChatPage() {
     let interval: NodeJS.Timeout;
     if (lagoaAtiva) {
       setTempoRestante(360);
-      interval = setInterval(() => { setTempoRestante((prev) => (prev !== null && prev > 0) ? prev - 1 : 0); }, 1000);
-    } else { setTempoRestante(null); }
+      interval = setInterval(() => {
+        setTempoRestante((prev) => {
+          if (prev !== null && prev > 0) return prev - 1;
+          return 0;
+        });
+      }, 1000);
+    } else {
+      setTempoRestante(null);
+    }
     return () => clearInterval(interval);
   }, [lagoaAtiva]);
 
-  const salvarPerfilConfig = async () => {
+  const handleUploadMeuAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image(); img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 180; canvas.height = 180;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, 180, 180);
+          setMeuAvatar(canvas.toDataURL("image/jpeg", 0.8));
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadIconeChat = (e: React.ChangeEvent<HTMLInputElement>, chatId: string) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image(); img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 120; canvas.height = 120;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, 120, 120);
+          const base64 = canvas.toDataURL("image/jpeg", 0.8);
+          setPrivados(prev => prev.map(p => p.id === chatId ? { ...p, icone: base64 } : p));
+        };
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const capturarAudioNativo = async (): Promise<MediaStream> => {
+    const rawStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false }
+    });
+    
+    if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") {
+      micAudioCtxRef.current.close();
+    }
+    
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    micAudioCtxRef.current = audioCtx;
+    
+    const source = audioCtx.createMediaStreamSource(rawStream);
+    const gainNode = audioCtx.createGain();
+    
+    gainNode.gain.value = ganhoMicrofoneRef.current / 100;
+    micGainNodeRef.current = gainNode;
+    
+    const destination = audioCtx.createMediaStreamDestination();
+    source.connect(gainNode);
+    gainNode.connect(destination);
+    
+    return destination.stream;
+  };
+
+  const alternarTesteMic = async () => {
+    if (testandoMic) {
+      if (testStreamRef.current) testStreamRef.current.getTracks().forEach(t => t.stop());
+      if (testAudioRef.current) testAudioRef.current.srcObject = null;
+      if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") {
+         micAudioCtxRef.current.close();
+         micAudioCtxRef.current = null;
+      }
+      setTestandoMic(false);
+    } else {
+      try {
+        const stream = await capturarAudioNativo();
+        testStreamRef.current = stream;
+        if (testAudioRef.current) testAudioRef.current.srcObject = stream;
+        setTestandoMic(true);
+      } catch (err) { alert("Permissão de microfone negada."); }
+    }
+  };
+
+  const fecharModalPerfil = async () => {
     if (testandoMic) alternarTesteMic();
+    
     if (session?.user?.email) {
       try {
         await fetch('/api/profile', {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: session.user.email, name: meuNomeReal, bio: meuStatusBio, avatar: meuAvatar, gender: meuGenero })
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: session.user.email,
+            name: meuNomeReal,
+            bio: meuStatusBio,
+            avatar: meuAvatar,
+            gender: meuGenero
+          })
         });
-      } catch (error) {}
+      } catch (error) {
+        console.error("Erro ao salvar perfil", error);
+      }
     }
+
+    setModalPerfilAberto(false);
   };
 
   const tocarRingtone = (tipo: 'chamando' | 'recebendo') => {
     pararRingtone();
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     ringtoneCtxRef.current = ctx;
+
     const beep = () => {
       if (ctx.state === "closed") return;
-      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.type = tipo === 'chamando' ? 'sine' : 'triangle';
       osc.frequency.setValueAtTime(tipo === 'chamando' ? 440 : 600, ctx.currentTime);
       if (tipo === 'recebendo') osc.frequency.setValueAtTime(800, ctx.currentTime + 0.15);
       gain.gain.setValueAtTime(0.05, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
     };
-    beep(); ringtoneIntervalRef.current = setInterval(beep, tipo === 'chamando' ? 2000 : 1000);
+
+    beep();
+    ringtoneIntervalRef.current = setInterval(beep, tipo === 'chamando' ? 2000 : 1000);
   };
 
   const pararRingtone = () => {
     if (ringtoneIntervalRef.current) clearInterval(ringtoneIntervalRef.current);
     if (ringtoneCtxRef.current && ringtoneCtxRef.current.state !== "closed") ringtoneCtxRef.current.close();
-    ringtoneIntervalRef.current = null; ringtoneCtxRef.current = null;
+    ringtoneIntervalRef.current = null;
+    ringtoneCtxRef.current = null;
   };
 
   useEffect(() => {
@@ -266,44 +466,43 @@ export default function ChatPage() {
     }
   }, [privados]);
 
-  const capturarAudioNativo = async (): Promise<MediaStream> => {
-    const rawStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } });
-    if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") micAudioCtxRef.current.close();
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    micAudioCtxRef.current = audioCtx;
-    const source = audioCtx.createMediaStreamSource(rawStream);
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.value = ganhoMicrofoneRef.current / 100;
-    micGainNodeRef.current = gainNode;
-    const destination = audioCtx.createMediaStreamDestination();
-    source.connect(gainNode); gainNode.connect(destination);
-    return destination.stream;
-  };
-
-  const alternarTesteMic = async () => {
-    if (testandoMic) {
-      if (testStreamRef.current) testStreamRef.current.getTracks().forEach(t => t.stop());
-      if (testAudioRef.current) testAudioRef.current.srcObject = null;
-      if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") { micAudioCtxRef.current.close(); micAudioCtxRef.current = null; }
-      setTestandoMic(false);
-    } else {
-      try { const stream = await capturarAudioNativo(); testStreamRef.current = stream; if (testAudioRef.current) testAudioRef.current.srcObject = stream; setTestandoMic(true); } catch (err) { alert("Permissão negada."); }
-    }
-  };
-
+  // ====== SOCKET E WEBRTC ======
   const obterOuCriarPeerConnection = () => {
     if (peerConnectionRef.current) return peerConnectionRef.current;
+
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }]
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+        { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+      ]
     });
-    pc.onicecandidate = (e) => { if (e.candidate) socketRef.current?.emit("webrtc_ice_candidate", { salaId: abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current, candidate: e.candidate }); };
-    pc.ontrack = (e) => {
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = (e.streams && e.streams[0]) ? e.streams[0] : (() => { const s = new MediaStream(); s.addTrack(e.track); return s; })();
-        const playPromise = remoteAudioRef.current.play();
-        if (playPromise !== undefined) playPromise.catch(() => window.addEventListener('click', () => remoteAudioRef.current?.play(), { once: true }));
+
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+        socketRef.current?.emit("webrtc_ice_candidate", { salaId: salaAlvo, candidate: e.candidate });
       }
     };
+
+    pc.ontrack = (e) => {
+      if (remoteAudioRef.current) {
+        if (e.streams && e.streams[0]) {
+          remoteAudioRef.current.srcObject = e.streams[0];
+        } else {
+          const stream = new MediaStream();
+          stream.addTrack(e.track);
+          remoteAudioRef.current.srcObject = stream;
+        }
+        const playPromise = remoteAudioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => { window.addEventListener('click', () => { remoteAudioRef.current?.play(); }, { once: true }); });
+        }
+      }
+    };
+
     peerConnectionRef.current = pc;
     return pc;
   };
@@ -312,11 +511,14 @@ export default function ChatPage() {
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
     if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
     try {
-      const stream = await capturarAudioNativo(); localStreamRef.current = stream;
-      const pc = obterOuCriarPeerConnection(); stream.getTracks().forEach(t => pc.addTrack(t, stream));
-      const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+      const stream = await capturarAudioNativo();
+      localStreamRef.current = stream;
+      const pc = obterOuCriarPeerConnection();
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
       socketRef.current?.emit("webrtc_offer", { salaId: salaAlvo, offer });
-    } catch {}
+    } catch { alert("Microfone negado."); }
   };
 
   const atenderChamadaVoz = async () => {
@@ -324,74 +526,116 @@ export default function ChatPage() {
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
     if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
     try {
-      const stream = await capturarAudioNativo(); localStreamRef.current = stream;
-      const pc = obterOuCriarPeerConnection(); stream.getTracks().forEach(t => pc.addTrack(t, stream));
+      const stream = await capturarAudioNativo();
+      localStreamRef.current = stream;
+      const pc = obterOuCriarPeerConnection();
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
       socketRef.current?.emit("aceitar_chamada_voz", { salaId: salaAlvo });
       setChamadaRecebida(false); setChamadaAtiva(true);
-    } catch {}
+    } catch { alert("Microfone negado."); }
   };
 
   useEffect(() => {
-    const socket = io(); socketRef.current = socket;
-    privados.forEach(chat => socket.emit("entrar_sala_privada", { novaSalaPrivada: chat.id }));
+    const socket = io();
+    socketRef.current = socket;
+
+    privados.forEach((chat) => socket.emit("entrar_sala_privada", { novaSalaPrivada: chat.id }));
 
     socket.on("aguardando_parceiro", () => { setProcurando(true); setLagoaPendente(null); setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false); });
     socket.on("parceiro_encontrado", (data) => { setProcurando(false); setLagoaId(data.salaId); setLagoaPendente(data.salaId); setMeuNomeAnon(data.meuNome); setParceiroNomeAnon(data.parceiroNome); setLagoaAtiva(false); setConfirmados(0); setJaAceitou(false); });
     socket.on("atualizar_confirmacao", (data) => setConfirmados(data.confirmados));
     socket.on("conexao_confirmada", (data) => { setLagoaId(data.salaId); setLagoaAtiva(true); setLagoaPendente(null); setLagoaMensagens([]); setConfirmados(2); setLagoaNaoLida(false); });
-    socket.on("tempo_esgotado", () => { alert("A lagoa fechou!"); sairDaLagoa(); });
+    socket.on("tempo_esgotado", () => { alert("A lagoa fechou (6 min)!"); sairDaLagoa(); });
 
     socket.on("receber_mensagem", (data: Mensagem & { salaId: string }) => {
       const novaMsg = { id: data.id, usuario: data.usuario, mensagem: data.mensagem, imagem: data.imagem, audio: data.audio, hora: data.hora };
+      
       if (data.salaId.startsWith("ninho_")) {
-        setPrivados(prev => {
+        setPrivados((prev) => {
+          const existe = prev.some(c => c.id === data.salaId);
           const ehAbaAtiva = data.salaId === abaAtivaRef.current;
-          if (prev.some(c => c.id === data.salaId)) return prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg], naoLida: !ehAbaAtiva || chat.naoLida } : chat);
-          return [...prev, { id: data.salaId, nomeCustom: "Novo Amigo", mensagens: [novaMsg], naoLida: !ehAbaAtiva, icone: "🔒" }];
+
+          if (existe) {
+            return prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: [...chat.mensagens, novaMsg], naoLida: !ehAbaAtiva || chat.naoLida } : chat);
+          } else {
+            return [...prev, { id: data.salaId, nomeCustom: "Novo Amigo", mensagens: [novaMsg], naoLida: !ehAbaAtiva, icone: "🔒" }];
+          }
         });
-      } else {
-        setLagoaMensagens(prev => [...prev, novaMsg]);
+      } else { 
+        setLagoaMensagens((prev) => [...prev, novaMsg]); 
         if (abaAtivaRef.current !== "lagoa") setLagoaNaoLida(true);
       }
-      if (!data.usuario.includes("SISTEMA")) dispararNotificacao(`DuckZone: ${data.usuario}`, novaMsg.mensagem);
+
+      const isSistema = data.usuario.includes("SISTEMA");
+      if (!isSistema) {
+        dispararNotificacao(`DuckZone: ${data.usuario}`, novaMsg.mensagem);
+      }
     });
 
     socket.on("mensagem_apagada", (data) => {
-      if (data.salaId.startsWith("ninho_")) setPrivados(prev => prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: chat.mensagens.filter(m => m.id !== data.msgId) } : chat));
-      else setLagoaMensagens(prev => prev.filter(m => m.id !== data.msgId));
+      if (data.salaId.startsWith("ninho_")) {
+        setPrivados((prev) => prev.map(chat => chat.id === data.salaId ? { ...chat, mensagens: chat.mensagens.filter(m => m.id !== data.msgId) } : chat));
+      } else { setLagoaMensagens((prev) => prev.filter(m => m.id !== data.msgId)); }
     });
 
-    socket.on("recebeu_chamada_voz", () => { setChamadaRecebida(true); tocarRingtone('recebendo'); dispararNotificacao("DuckZone", "📞 Alguém está te ligando!"); });
+    socket.on("recebeu_chamada_voz", () => { 
+      setChamadaRecebida(true); 
+      tocarRingtone('recebendo'); 
+      dispararNotificacao("DuckZone", "📞 Alguém está te ligando!"); 
+    });
     socket.on("chamada_voz_aceita_pelo_parceiro", async () => { pararRingtone(); setChamadaAtiva(true); setStatusConvite(null); await enviarOfertaWebRTC(); });
+
     socket.on("webrtc_offer", async (data) => {
       try {
-        const pc = obterOuCriarPeerConnection(); await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-        iceCandidatesQueue.current.forEach(async c => { try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch{} }); iceCandidatesQueue.current = [];
-        const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
-        socketRef.current?.emit("webrtc_answer", { salaId: abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current, answer });
+        const pc = obterOuCriarPeerConnection();
+        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+        iceCandidatesQueue.current.forEach(async (c) => { try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e){} });
+        iceCandidatesQueue.current = [];
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+        socketRef.current?.emit("webrtc_answer", { salaId: salaAlvo, answer });
         setChamadaAtiva(true);
-      } catch {}
+      } catch (err) { console.error("Erro oferta:", err); }
     });
+
     socket.on("webrtc_answer", async (data) => {
-      if (peerConnectionRef.current) {
-        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-        iceCandidatesQueue.current.forEach(async c => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch{} }); iceCandidatesQueue.current = []; setChamadaAtiva(true);
+      if (peerConnectionRef.current) { 
+        await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer)); 
+        iceCandidatesQueue.current.forEach(async (c) => { try { await peerConnectionRef.current!.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e){} });
+        iceCandidatesQueue.current = [];
+        setChamadaAtiva(true); 
       }
     });
+
     socket.on("webrtc_ice_candidate", async (data) => {
-      if (data.candidate) {
-        if (peerConnectionRef.current?.remoteDescription) { try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch{} } else { iceCandidatesQueue.current.push(data.candidate); }
+      if (data.candidate) { 
+        if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
+          try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch (e) {} 
+        } else { iceCandidatesQueue.current.push(data.candidate); }
       }
     });
-    socket.on("chamada_voz_recusada", () => { pararRingtone(); alert("Chamada recusada."); encerrarChamadaLocal(); });
+
+    socket.on("chamada_voz_recusada", () => { pararRingtone(); alert("O outro pato recusou a chamada."); encerrarChamadaLocal(); });
     socket.on("chamada_voz_encerrada", () => { pararRingtone(); encerrarChamadaLocal(); });
-    socket.on("recebeu_convite_privado", (data) => { setConvitePendente(data.solicitante); setStatusConvite(null); dispararNotificacao("DuckZone", `🔒 ${data.solicitante} te convidou para um Ninho Privado!`); });
+    
+    socket.on("recebeu_convite_privado", (data) => { 
+      setConvitePendente(data.solicitante); 
+      setStatusConvite(null); 
+      dispararNotificacao("DuckZone", `🔒 ${data.solicitante} te convidou para um Ninho Privado!`);
+    });
+
     socket.on("migrar_para_privado", (data) => {
-      const novaId = data.novaSalaPrivada; socket.emit("entrar_sala_privada", { novaSalaPrivada: novaId });
-      setPrivados(prev => prev.some(p => p.id === novaId) ? prev : [...prev, { id: novaId, mensagens: [{ id: `sys_${Date.now()}`, usuario: "SISTEMA 🔒", mensagem: `Vocês entraram em um Ninho! Identidades reveladas.`, hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }], naoLida: false, icone: "🔒" }]);
+      const novaId = data.novaSalaPrivada;
+      socket.emit("entrar_sala_privada", { novaSalaPrivada: novaId });
+      setPrivados((prev) => {
+        if (prev.some(p => p.id === novaId)) return prev;
+        return [...prev, { id: novaId, mensagens: [{ id: `sys_${Date.now()}`, usuario: "SISTEMA 🔒", mensagem: `Vocês entraram em um Ninho Privado! Suas identidades foram reveladas.`, hora: new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) }], naoLida: false, icone: "🔒" }];
+      });
       setAbaAtiva(novaId); setLagoaAtiva(false); setConvitePendente(null); setStatusConvite(null); setLagoaNaoLida(false);
     });
-    socket.on("convite_privado_recusado", () => { setStatusConvite("Convite recusado."); setTimeout(() => setStatusConvite(null), 3000); });
+
+    socket.on("convite_privado_recusado", () => { setStatusConvite("O pato recusou o convite."); setTimeout(() => setStatusConvite(null), 3000); });
     socket.on("parceiro_desconectou", () => { pararRingtone(); setLagoaAtiva(false); setLagoaId(null); setLagoaPendente(null); setProcurando(false); setJaAceitou(false); setConfirmados(0); encerrarChamadaLocal(); setLagoaNaoLida(false); });
 
     return () => { pararRingtone(); if(testandoMic) alternarTesteMic(); socket.disconnect(); };
@@ -401,47 +645,100 @@ export default function ChatPage() {
 
   const togglePreferencia = (valor: string) => {
     if (isGeneroSecreto && valor !== 'qualquer') return alert("Opção bloqueada por preferir não informar o gênero.");
-    setPreferenciasGenero(prev => {
+    setPreferenciasGenero((prev) => {
       if (valor === 'qualquer') return ['qualquer'];
-      const semQ = prev.filter(p => p !== 'qualquer');
-      if (semQ.includes(valor)) { const n = semQ.filter(p => p !== valor); return n.length === 0 ? ['qualquer'] : n; }
-      return [...semQ, valor];
+      
+      const semQualquer = prev.filter(p => p !== 'qualquer');
+      if (semQualquer.includes(valor)) {
+        const nova = semQualquer.filter(p => p !== valor);
+        return nova.length === 0 ? ['qualquer'] : nova;
+      } else {
+        return [...semQualquer, valor];
+      }
     });
   };
 
-  const procurarPato = () => {
-    setProcurando(true);
-    const emailsAmigos = listaAmigosAceitos.map(a => (a.senderId === meuIdBanco ? a.receiver : a.sender).email);
-    socketRef.current?.emit("procurar_parceiro", { meuGenero, preferencia: preferenciasGenero, meuEmail: session?.user?.email, amigosEmails: emailsAmigos });
+  const procurarPato = () => { 
+    setProcurando(true); 
+    
+    const emailsAmigos = listaAmigosAceitos.map(amizade => {
+       const amigo = amizade.senderId === meuIdBanco ? amizade.receiver : amizade.sender;
+       return amigo.email;
+    });
+
+    socketRef.current?.emit("procurar_parceiro", {
+      meuGenero: meuGenero,
+      preferencia: preferenciasGenero,
+      meuEmail: session?.user?.email, 
+      amigosEmails: emailsAmigos
+    }); 
   };
-  const cancelarBusca = () => { setProcurando(false); socketRef.current?.emit("cancelar_busca"); };
+
+  const cancelarBusca = () => {
+    setProcurando(false);
+    socketRef.current?.emit("cancelar_busca");
+  };
+  
   const aceitarConexao = () => { if (lagoaPendente && !jaAceitou) { setJaAceitou(true); socketRef.current?.emit("confirmar_conexao", { salaId: lagoaPendente }); } };
   const recusarConexao = () => { setLagoaPendente(null); setJaAceitou(false); setConfirmados(0); procurarPato(); };
-  const solicitarPrivado = () => { if (lagoaId) { setStatusConvite("Convite enviado..."); socketRef.current?.emit("solicitar_chat_privado", { salaId: lagoaId, meuNome: `${meuNomeReal}#${minhaTag}` }); } };
-  const responderConvite = (aceito: boolean) => { if (lagoaId) socketRef.current?.emit("responder_convite_privado", { salaId: lagoaId, aceito }); setConvitePendente(null); };
-  const sairDaLagoa = () => { socketRef.current?.emit("sair_da_lagoa"); encerrarChamadaLocal(); setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null); setLagoaNaoLida(false); };
-  
+  const solicitarPrivado = () => { if (!lagoaId) return; setStatusConvite("Convite enviado! Aguardando..."); socketRef.current?.emit("solicitar_chat_privado", { salaId: lagoaId, meuNome: `${meuNomeReal}#${minhaTag}` }); };
+  const responderConvite = (aceito: boolean) => { if (!lagoaId) return; socketRef.current?.emit("responder_convite_privado", { salaId: lagoaId, aceito }); setConvitePendente(null); };
+
+  const sairDaLagoa = () => {
+    socketRef.current?.emit("sair_da_lagoa");
+    encerrarChamadaLocal();
+    setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null); setLagoaNaoLida(false);
+  };
+
   const solicitarChamadaVoz = () => {
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
-    if (salaAlvo && abaAtivaRef.current !== "lagoa") { socketRef.current?.emit("iniciar_chamada_voz", { salaId: salaAlvo }); setStatusConvite("Chamando... 📞"); tocarRingtone('chamando'); }
+    if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
+    socketRef.current?.emit("iniciar_chamada_voz", { salaId: salaAlvo });
+    setStatusConvite("Chamando... 📞");
+    tocarRingtone('chamando');
   };
-  const recusarChamadaVoz = () => {
-    pararRingtone(); const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
-    if (salaAlvo && abaAtivaRef.current !== "lagoa") socketRef.current?.emit("recusar_chamada_voz", { salaId: salaAlvo }); setChamadaRecebida(false);
+
+  const recusarChamadaVoz = () => { 
+    pararRingtone(); 
+    const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+    if (salaAlvo && abaAtivaRef.current !== "lagoa") socketRef.current?.emit("recusar_chamada_voz", { salaId: salaAlvo }); 
+    setChamadaRecebida(false); 
   };
+
   const alternarMuteMicrofone = () => {
-    setMicrofoneMutado(prev => { const n = !prev; if (localStreamRef.current) localStreamRef.current.getAudioTracks().forEach(t => t.enabled = !n); if (!n && audioMutado) setAudioMutado(false); return n; });
+    setMicrofoneMutado((prev) => {
+      const novo = !prev;
+      if (localStreamRef.current) localStreamRef.current.getAudioTracks().forEach(track => track.enabled = !novo);
+      if (!novo && audioMutado) setAudioMutado(false);
+      return novo;
+    });
   };
-  const alternarAudioMutado = () => { setAudioMutado(prev => { const n = !prev; if (n && !microfoneMutado) alternarMuteMicrofone(); return n; }); };
+
+  const alternarAudioMutado = () => {
+    setAudioMutado((prev) => {
+      const novo = !prev;
+      if (novo && !microfoneMutado) alternarMuteMicrofone();
+      return novo;
+    });
+  };
+
   const encerrarChamadaLocal = () => {
-    pararRingtone(); if (peerConnectionRef.current) { peerConnectionRef.current.close(); peerConnectionRef.current = null; }
-    if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; } iceCandidatesQueue.current = [];
-    if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") { micAudioCtxRef.current.close(); micAudioCtxRef.current = null; }
+    pararRingtone();
+    if (peerConnectionRef.current) { peerConnectionRef.current.close(); peerConnectionRef.current = null; }
+    if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
+    iceCandidatesQueue.current = [];
+    if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") {
+       micAudioCtxRef.current.close();
+       micAudioCtxRef.current = null;
+    }
     setChamadaAtiva(false); setChamadaRecebida(false); setMicrofoneMutado(false); setAudioMutado(false); setStatusConvite(null);
   };
-  const desligarChamada = () => {
-    pararRingtone(); const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
-    if (salaAlvo && abaAtivaRef.current !== "lagoa") socketRef.current?.emit("encerrar_chamada_voz", { salaId: salaAlvo }); encerrarChamadaLocal();
+
+  const desligarChamada = () => { 
+    pararRingtone(); 
+    const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
+    if (salaAlvo && abaAtivaRef.current !== "lagoa") socketRef.current?.emit("encerrar_chamada_voz", { salaId: salaAlvo }); 
+    encerrarChamadaLocal(); 
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -451,44 +748,61 @@ export default function ChatPage() {
       reader.onload = (event) => {
         const img = new Image(); img.src = event.target?.result as string;
         img.onload = () => {
-          const canvas = document.createElement("canvas"); const MAX = 800; const s = MAX / img.width;
-          canvas.width = Math.min(img.width, MAX); canvas.height = img.height * (img.width > MAX ? s : 1);
-          canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 800; const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = Math.min(img.width, MAX_WIDTH); canvas.height = img.height * (img.width > MAX_WIDTH ? scaleSize : 1);
+          const ctx = canvas.getContext("2d"); ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
           setImagemBase64(canvas.toDataURL("image/jpeg", 0.7));
         };
-      }; reader.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const alternarGravacaoAudioMsg = async () => {
-    if (gravandoAudioMsg) { msgMediaRecorderRef.current?.stop(); setGravandoAudioMsg(false); }
-    else {
+    if (gravandoAudioMsg) {
+      msgMediaRecorderRef.current?.stop(); setGravandoAudioMsg(false);
+    } else {
       try {
         const stream = await capturarAudioNativo();
         const options = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: 128000 } : undefined;
-        const recorder = new MediaRecorder(stream, options); msgMediaRecorderRef.current = recorder; audioChunksRef.current = [];
-        recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+        const recorder = new MediaRecorder(stream, options);
+        msgMediaRecorderRef.current = recorder;
+        audioChunksRef.current = [];
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
         recorder.onstop = () => {
           const audioBlob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
           const reader = new FileReader();
           reader.onloadend = () => {
             const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
             if (salaAlvo) socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: abaAtiva !== "lagoa" ? `${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: "🎤 Mensagem de áudio", audio: reader.result as string });
-          }; reader.readAsDataURL(audioBlob);
-          stream.getTracks().forEach(t => t.stop());
-          if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") { micAudioCtxRef.current.close(); micAudioCtxRef.current = null; }
-        }; recorder.start(); setGravandoAudioMsg(true);
+          };
+          reader.readAsDataURL(audioBlob);
+          stream.getTracks().forEach((track) => track.stop());
+          if (micAudioCtxRef.current && micAudioCtxRef.current.state !== "closed") {
+             micAudioCtxRef.current.close();
+             micAudioCtxRef.current = null;
+          }
+        };
+        recorder.start();
+        setGravandoAudioMsg(true);
       } catch { alert("Microfone negado."); }
     }
   };
 
   const enviarMensagem = (e: React.FormEvent) => {
-    e.preventDefault(); if (!texto.trim() && !imagemBase64) return;
-    const isP = abaAtiva !== "lagoa"; const sala = isP ? abaAtiva : lagoaId; if (!sala) return;
-    socketRef.current?.emit("enviar_mensagem", { salaId: sala, remetenteNome: isP ? `${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: texto, imagem: isP ? imagemBase64 : null });
+    e.preventDefault();
+    if (!texto.trim() && !imagemBase64) return;
+    const isPrivado = abaAtiva !== "lagoa"; const salaAlvo = isPrivado ? abaAtiva : lagoaId;
+    if (!salaAlvo) return;
+    socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: isPrivado ? `${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: texto, imagem: isPrivado ? imagemBase64 : null });
     setTexto(""); setImagemBase64(null);
   };
-  const apagarMensagem = (msgId: string) => { const sala = abaAtiva !== "lagoa" ? abaAtiva : lagoaId; if (sala) socketRef.current?.emit("apagar_mensagem", { salaId: sala, msgId }); };
+
+  const apagarMensagem = (msgId: string) => {
+    const salaAlvo = abaAtiva !== "lagoa" ? abaAtiva : lagoaId;
+    if (salaAlvo) socketRef.current?.emit("apagar_mensagem", { salaId: salaAlvo, msgId });
+  };
 
   const isLagoa = abaAtiva === "lagoa";
   const chatAtivoData = privados.find(p => p.id === abaAtiva);
@@ -496,277 +810,787 @@ export default function ChatPage() {
   const ehChatDeAmigo = Boolean(chatAtivoData?.amigoRef);
 
   return (
-    <div data-theme={theme} className="chat-layout-fullscreen">
-      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
+    <div data-theme={theme} className="app-layout">
+      {menuAberto && <div className="menu-overlay open" onClick={() => setMenuAberto(false)}></div>}
+
+      <audio ref={remoteAudioRef} autoPlay playsInline controls={false} style={{ display: 'none' }} />
       <audio ref={testAudioRef} autoPlay playsInline muted={false} style={{ display: 'none' }} />
 
       <style dangerouslySetInnerHTML={{__html: `
-        .chat-layout-fullscreen { width: 100vw; height: 100vh; display: flex; background: var(--bg-gradient); overflow: hidden; font-family: -apple-system, sans-serif; }
-        .chat-icon-rail { width: 68px; background-color: rgba(0, 0, 0, 0.08); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 16px; z-index: 20; flex-shrink: 0; }
-        .rail-btn { width: 46px; height: 46px; border-radius: 14px; border: 1px solid var(--border-color); background-color: var(--bg-input); color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; transition: all 0.2s; }
-        .rail-btn.active { background: var(--btn-blue-grad); color: #fff; }
-        .rail-btn-duck { width: 28px; height: 28px; object-fit: contain; }
-        .chat-sidebar { width: 280px; background-color: rgba(255, 255, 255, 0.2); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s; z-index: 15; }
-        .sidebar-header-area { padding: 20px 16px 10px; display: flex; justify-content: space-between; align-items: center; }
-        .sidebar-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin: 0; }
-        .sidebar-scroll { flex: 1; overflow-y: auto; padding: 0 16px 16px; display: flex; flexDirection: column; gap: 12px; }
+        /* 🦆 FIX DE SCROLLBARS MODERNO E LIMPO */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--icon-color); }
+        * { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, 0.2) transparent; }
+
+        .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-gradient); color: var(--text-main); font-family: sans-serif; }
         
-        .friend-item-btn { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background-color: var(--bg-input); border: 1px solid var(--border-color); font-size: 14px; font-weight: 600; color: var(--text-main); cursor: pointer; transition: transform 0.15s; margin-bottom: 8px;}
-        .friend-item-btn.active { border-width: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; }
-        .status-dot.online { background-color: #10b981; } .status-dot.offline { background-color: #9ca3af; }
-        
-        .chat-main-area { flex: 1; display: flex; flex-direction: column; justify-content: space-between; position: relative; min-width: 0; }
-        .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: var(--chat-header-bg); border-bottom: 1px solid var(--border-color); }
-        .chat-header-user { display: flex; align-items: center; gap: 12px; }
-        .chat-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid var(--icon-color); color: var(--icon-color); cursor: pointer; }
-        .chat-header-name { font-size: 18px; font-weight: 700; color: var(--text-main); }
-        .chat-icons { display: flex; gap: 18px; font-size: 20px; color: var(--icon-color); cursor: pointer; }
-        
-        .chat-messages { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
-        .chat-bubble { max-width: 60%; padding: 14px 20px; border-radius: 24px; font-size: 15px; color: #000; box-shadow: var(--chat-glow); line-height: 1.45; word-break: break-word; }
-        .chat-bubble.me { align-self: flex-end; background-color: var(--bubble-me); border-bottom-right-radius: 4px; }
-        .chat-bubble.other { align-self: flex-start; background-color: var(--bubble-other); border-bottom-left-radius: 4px; color: var(--text-main); }
-        
-        .chat-input-area { padding: 20px 24px; background: transparent; }
-        .chat-input-bar { display: flex; align-items: center; border: 1.5px solid var(--border-color); border-radius: 99px; padding: 10px 18px; background: var(--chat-input-bar-bg); }
-        .chat-input-bar input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-main); margin-left: 12px; font-size: 15px; }
-        
-        /* Modal Config & Friends Overlays */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
-        .modal-card { background: var(--bg-card); width: 100%; max-width: 400px; border-radius: 20px; border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column; max-height: 85vh; }
-        .modal-header { padding: 16px 20px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-weight: bold; }
-        .modal-body { padding: 20px; overflow-y: auto; color: var(--text-main); display: flex; flex-direction: column; gap: 16px;}
-        
-        /* Elements */
-        .btn-call { padding: 8px 16px; border-radius: 12px; border: 1px solid #10b981; color: #10b981; background: rgba(16,185,129,0.1); cursor: pointer; font-weight: bold; }
-        .d-call-panel { background: var(--bg-input); border: 1px solid var(--border-color); margin: 12px 24px; padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .d-action-btn { width: 40px; height: 40px; border-radius: 50%; border: none; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .pro-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); outline: none; }
-        .btn-lagoa { padding: 12px; border-radius: 99px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); font-weight: bold; cursor: pointer; flex: 1; text-align: center; margin: 4px; }
-        .btn-lagoa.active { background: var(--btn-blue-grad); color: #fff; }
+        .sidebar { width: 340px; background: rgba(255,255,255,0.1); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 100; flex-shrink: 0; backdrop-filter: blur(5px); }
+        .main-chat-area { flex: 1; display: flex; flex-direction: column; position: relative; min-width: 0; background: transparent; }
+        .hamburger-btn { display: none; background: transparent; border: none; color: var(--text-main); font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
+        .hamburger-btn:active { transform: scale(0.9); }
+        .menu-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 90; backdrop-filter: blur(3px); }
         
         @media (max-width: 768px) {
-          .chat-sidebar { position: absolute; left: 68px; height: 100%; transform: translateX(-100%); width: calc(100% - 68px); background: var(--bg-gradient); box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
-          .chat-sidebar.open { transform: translateX(0); }
+          .sidebar { position: absolute; height: 100%; top: 0; left: 0; transform: translateX(-100%); max-width: 85vw; box-shadow: 5px 0 25px rgba(0,0,0,0.5); background: var(--bg-gradient); }
+          .sidebar.open { transform: translateX(0); }
+          .hamburger-btn { display: block; color: var(--icon-color); }
+          .menu-overlay.open { display: block; }
+          .main-chat-area { width: 100%; }
           .chat-bubble { max-width: 85%; }
+        }
+
+        .sidebar-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); background: transparent; }
+        .back-link { text-decoration: none; color: var(--text-muted); font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s; }
+        .back-link:hover { color: var(--icon-color); }
+
+        .profile-card-container { padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
+        .profile-card { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 16px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .profile-card-avatar { width: 46px; height: 48px; background: transparent; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; border: 1px solid var(--border-color); flex-shrink: 0; overflow: hidden; }
+        .profile-card-details { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+        .profile-card-name { font-size: 14px; font-weight: 800; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .profile-card-tag { font-size: 11px; color: var(--icon-color); font-family: monospace; font-weight: bold; }
+        .profile-card-bio { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+
+        .profile-actions-inline { display: flex; gap: 6px; }
+        .icon-action-btn { width: 34px; height: 34px; border-radius: 10px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 15px; cursor: pointer; transition: all 0.2s; }
+        .icon-action-btn:hover { background: var(--btn-blue-grad); color: #fff; border-color: transparent; transform: translateY(-1px); }
+
+        .chat-list { display: flex; flex-direction: column; overflow-y: auto; flex: 1; padding: 12px 12px; gap: 6px; }
+        .chat-item { display: flex; align-items: center; padding: 10px 14px; gap: 14px; cursor: pointer; transition: all 0.2s; border-radius: 12px; border: 1px solid transparent; color: var(--text-main); }
+        .chat-item:hover { background: var(--bg-input); border-color: var(--border-color); }
+        .chat-item.active { background: var(--btn-blue-grad); color: #fff; }
+        
+        .chat-item-avatar { width: 42px; height: 42px; border-radius: 12px; background: transparent; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; overflow: hidden; }
+        .chat-item-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .chat-item-title { font-weight: 700; font-size: 14px; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-item-sub { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+        .chat-item.active .chat-item-sub { color: #fff; opacity: 0.8; }
+
+        .unread-dot { width: 10px; height: 10px; background-color: #f43f5e; border-radius: 50%; box-shadow: 0 0 6px rgba(244, 63, 94, 0.8); flex-shrink: 0; }
+
+        .discord-slider { -webkit-appearance: none; width: 100%; background: transparent; }
+        .discord-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: var(--icon-color); border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5); margin-top: -5px; }
+        .discord-slider::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: transparent; border-bottom: 1px solid var(--border-color); }
+        .discord-call-panel-v2 { background-color: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; margin: 10px 16px; }
+        .d-call-info { display: flex; align-items: center; gap: 12px; }
+        .d-call-dot { width: 12px; height: 12px; background-color: #23a559; border-radius: 50%; box-shadow: 0 0 8px rgba(35, 165, 89, 0.6); animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(35, 165, 89, 0); } 100% { box-shadow: 0 0 0 0 rgba(35, 165, 89, 0); } }
+        .d-call-text { display: flex; flex-direction: column; }
+        .d-call-title { color: #23a559; font-weight: 700; font-size: 14px; }
+        .d-call-subtitle { color: var(--text-muted); font-size: 12px; font-weight: 500; }
+        .d-call-actions { display: flex; gap: 12px; }
+        .d-action-btn { width: 40px; height: 40px; border-radius: 50%; background-color: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; }
+        .d-action-btn:hover { background-color: var(--btn-blue-grad); color: #fff; }
+        .d-action-btn.btn-muted { background-color: #da373c; color: #fff; }
+        .d-action-btn.btn-disconnect { background-color: #da373c; color: #fff; border-radius: 24px; width: auto; padding: 0 16px; font-size: 14px; font-weight: 700; gap: 8px; }
+        
+        .pro-input { width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); padding: 14px 16px; border-radius: 12px; font-size: 14px; outline: none; }
+        .pro-input:focus { border-color: var(--icon-color); box-shadow: 0 0 0 3px rgba(0,0,0, 0.1); }
+        .pro-label { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; }
+        .avatar-btn { font-size: 26px; padding: 10px; border-radius: 14px; cursor: pointer; background: var(--bg-input); border: 1px solid var(--border-color); flex: 1; display: flex; justify-content: center; }
+        .avatar-btn.active { background: rgba(45, 212, 191, 0.15); border-color: var(--icon-color); }
+        .btn-test-mic { width: 100%; padding: 16px; border-radius: 12px; cursor: pointer; font-weight: 800; font-size: 14px; border: 1px solid var(--border-color); background: var(--bg-input); color: #f43f5e; display: flex; justify-content: center; gap: 8px;}
+        .btn-test-mic.active { border-color: #f43f5e; background: rgba(244, 63, 94, 0.1); }
+        
+        .friend-card { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: var(--bg-input); border-radius: 16px; border: 1px solid var(--border-color); margin-bottom: 12px; transition: all 0.2s ease; cursor: pointer; }
+        .friend-card:hover { border-color: var(--icon-color); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .friend-avatar-wrap { position: relative; width: 48px; height: 48px; background: transparent; border-radius: 50%; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }
+        .friend-info { display: flex; flex-direction: column; }
+        .friend-name { font-weight: 800; font-size: 16px; color: var(--text-main); display: flex; align-items: center; gap: 6px; }
+        .friend-tag { font-size: 13px; color: var(--icon-color); font-family: monospace; background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 6px; }
+        .chat-action-btn { width: 40px; height: 40px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--icon-color); transition: all 0.2s; }
+        .friend-card:hover .chat-action-btn { background: var(--btn-blue-grad); color: #000; transform: scale(1.1); }
+        .btn-accept { background: #10b981; color: #fff; border: none; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 900; transition: 0.2s; }
+        .btn-accept:hover { background: #059669; transform: scale(1.05); }
+        .btn-reject { background: transparent; color: #f43f5e; border: 1px solid #f43f5e; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 900; transition: 0.2s; }
+        .btn-reject:hover { background: rgba(244, 63, 94, 0.1); transform: scale(1.05); }
+        
+        .pref-btn { flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; text-align: center; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-muted); transition: 0.2s; }
+        .pref-btn.active { background: var(--btn-blue-grad); border-color: var(--icon-color); color: #fff; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        @media (max-width: 500px) {
+          .hide-on-mobile { display: none !important; }
+          .d-call-info { max-width: 50%; }
+          .d-call-subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         }
       `}} />
 
-      <div className="chat-icon-rail">
-        <button className={`rail-btn ${abaChat === "grupos" ? "active" : ""}`} onClick={() => { setAbaChat("grupos"); setMenuAberto(true); }} title="Ninhos & Lagoa">
-          <img src={duckImgSrc} alt="Pato" className="rail-btn-duck" />
-        </button>
-        <button className={`rail-btn ${abaChat === "amigos" ? "active" : ""}`} onClick={() => { setAbaChat("amigos"); setMenuAberto(true); }} title="Amigos">👥</button>
-        <button className={`rail-btn ${abaChat === "config" ? "active" : ""}`} onClick={() => { setAbaChat("config"); setMenuAberto(true); }} title="Configurações">⚙️</button>
-      </div>
+      <aside className={`sidebar ${menuAberto ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <Link href="/" className="back-link">
+            ← Voltar para o Início
+          </Link>
+        </div>
 
-      <div className={`chat-sidebar ${menuAberto ? 'open' : ''}`}>
-        {abaChat === "grupos" && (
-          <>
-            <div className="sidebar-header-area"><h3 className="sidebar-title">Ninhos & Lagoas</h3></div>
-            <div className="sidebar-scroll">
-              <div className={`friend-item-btn ${isLagoa ? "active" : ""}`} onClick={() => { setAbaAtiva("lagoa"); setMenuAberto(false); }}>
-                <span style={{fontSize: '20px'}}>🌊</span> Lagoa Pública
-              </div>
-              {privados.map((chat) => (
-                <div key={chat.id} className={`friend-item-btn ${abaAtiva === chat.id ? "active" : ""}`} onClick={() => { setAbaAtiva(chat.id); setMenuAberto(false); setPrivados(prev => prev.map(p => p.id === chat.id ? { ...p, naoLida: false } : p)); }}>
-                  <span style={{fontSize: '20px'}}>{chat.icone && !chat.icone.startsWith("data:") ? chat.icone : "🔒"}</span> {chat.nomeCustom || "Ninho Privado"}
-                  {chat.naoLida && <div className="status-dot online" style={{marginLeft: 'auto'}}></div>}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {abaChat === "amigos" && (
-          <>
-            <div className="sidebar-header-area">
-              <h3 className="sidebar-title">Amigos</h3>
-              <button onClick={() => setAbaAmigos(prev => prev === 'add' ? 'list' : 'add')} style={{ background: 'var(--btn-gold-grad)', border: 'none', padding: '6px 12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
-                {abaAmigos === 'add' ? "Ver Lista" : "+ Add"}
-              </button>
-            </div>
-            <div className="sidebar-scroll">
-              {abaAmigos === 'add' ? (
-                <form onSubmit={enviarConviteAmizade} style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                  <span style={{fontSize: '12px', color: 'var(--text-main)'}}>Adicionar por Tag (Ex: Pato#1234)</span>
-                  <input className="pro-input" value={amigoTagInput} onChange={(e) => setAmigoTagInput(e.target.value)} placeholder="Nome#Tag" required />
-                  <button type="submit" style={{padding: '10px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold'}}>Enviar Convite</button>
-                  {amigoMensagem && <div style={{fontSize: '12px', color: 'var(--text-main)', marginTop: '8px'}}>{amigoMensagem}</div>}
-                  
-                  {listaPendentes.length > 0 && (
-                    <div style={{marginTop: '16px'}}>
-                      <span style={{fontSize: '13px', fontWeight: 'bold', color: 'var(--text-main)'}}>Pendentes:</span>
-                      {listaPendentes.map(req => (
-                        <div key={req.id} style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-input)', borderRadius: '8px', marginTop: '8px', border: '1px solid var(--border-color)'}}>
-                          <span style={{color: 'var(--text-main)', fontSize: '13px'}}>{req.sender.name}</span>
-                          <div>
-                            <button onClick={() => responderConviteAmizade(req.id, 'ACCEPT')} style={{background: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', marginRight: '4px'}}>✓</button>
-                            <button onClick={() => responderConviteAmizade(req.id, 'REJECT')} style={{background: '#f43f5e', color: '#fff', border: 'none', borderRadius: '4px'}}>✕</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </form>
+        <div className="profile-card-container">
+          <div className="profile-card">
+            <div className="profile-card-avatar">
+              {meuAvatar.startsWith("data:image/") ? (
+                <img src={meuAvatar} alt="Avatar" style={{ width: '100%', height: '100%', borderRadius: '12px', objectFit: 'cover' }} />
               ) : (
-                listaAmigosAceitos.map((amizade) => {
-                  const amigo = amizade.senderId === meuIdBanco ? amizade.receiver : amizade.sender;
-                  return (
-                    <div key={amizade.id} className="friend-item-btn" onClick={() => iniciarChatComAmigo(amizade.id)}>
-                      <div className="status-dot online"></div> {amigo.name}
-                    </div>
-                  );
-                })
+                meuAvatar
               )}
             </div>
-          </>
-        )}
-
-        {abaChat === "config" && (
-          <>
-            <div className="sidebar-header-area"><h3 className="sidebar-title">Configurações</h3></div>
-            <div className="sidebar-scroll">
-              <input className="pro-input" value={meuNomeReal} onChange={e => setMeuNomeReal(e.target.value)} placeholder="Nome" />
-              <input className="pro-input" value={`#${minhaTag}`} disabled style={{opacity: 0.6}} />
-              <input className="pro-input" value={meuStatusBio} onChange={e => setMeuStatusBio(e.target.value)} placeholder="Status/Bio" />
-              <select className="pro-input" value={meuGenero} onChange={e => setMeuGenero(e.target.value)}>
-                <option value="prefiro-nao-dizer">Prefiro não dizer</option>
-                <option value="masculino">Masculino</option>
-                <option value="feminino">Feminino</option>
-                <option value="nao-binario">Não-Binário</option>
-              </select>
-              <button onClick={salvarPerfilConfig} style={{padding: '12px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold'}}>Salvar Perfil</button>
-              <button onClick={toggleTheme} style={{padding: '12px', background: 'var(--bg-input)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '12px', fontWeight: 'bold', marginTop: '16px'}}>
-                Tema: {isDark ? "Escuro 🌙" : "Claro ☀️"}
-              </button>
-              <button onClick={handleToggleNotificacoes} style={{padding: '12px', background: permiteNotificacoes ? 'rgba(16,185,129,0.1)' : 'var(--bg-input)', color: 'var(--text-main)', border: `1px solid ${permiteNotificacoes ? '#10b981' : 'var(--border-color)'}`, borderRadius: '12px', fontWeight: 'bold'}}>
-                Notificações {permiteNotificacoes ? "✅" : "❌"}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="chat-main-area">
-        <header className="chat-header">
-          <div className="chat-header-user">
-            <span onClick={() => setMenuAberto(!menuAberto)} style={{ cursor: "pointer", fontSize: "22px", color: "var(--icon-color)", display: "block" }}>
-              {menuAberto ? "✖" : "☰"}
-            </span>
-            <div className="chat-avatar" onClick={() => { if(!isLagoa && !ehChatDeAmigo) setEditandoNome(abaAtiva); }}>
-              {isLagoa ? "🌊" : (chatAtivoData?.icone && chatAtivoData.icone.startsWith("data:") ? <img src={chatAtivoData.icone} style={{width:'100%', height:'100%', borderRadius:'50%'}}/> : (chatAtivoData?.icone || "👤"))}
+            <div className="profile-card-details">
+              <span className="profile-card-name">{meuNomeReal}</span>
+              <span className="profile-card-tag">#{minhaTag}</span>
+              <span className="profile-card-bio">{meuStatusBio}</span>
             </div>
             
+            <div className="profile-actions-inline">
+              <button onClick={() => { setModalPerfilAberto(true); setAbaConfig('perfil'); }} className="icon-action-btn" title="Configurações">⚙️</button>
+              <button onClick={() => { setModalAmigosAberto(true); setAbaAmigos('add'); setAmigoMensagem(""); }} className="icon-action-btn" title="Amigos">👥</button>
+            </div>
+          </div>
+        </div>
+
+        <div className="chat-list">
+          <div className={`chat-item ${isLagoa ? "active" : ""}`} onClick={() => { setAbaAtiva("lagoa"); setMenuAberto(false); setLagoaNaoLida(false); }}>
+            <div className="chat-item-avatar">🌊</div>
+            <div className="chat-item-info">
+              <span className="chat-item-title">Lagoa Pública</span>
+              <span className="chat-item-sub">Mergulho Anônimo</span>
+            </div>
+            {lagoaNaoLida && <div className="unread-dot"></div>}
+          </div>
+
+          {privados.map((chat, i) => (
+            <div key={chat.id} className={`chat-item ${abaAtiva === chat.id ? "active" : ""}`} onClick={() => { setAbaAtiva(chat.id); setMenuAberto(false); setPrivados(prev => prev.map(p => p.id === chat.id ? { ...p, naoLida: false } : p)); }}>
+              <div className="chat-item-avatar">
+                {chat.icone && chat.icone.startsWith("data:image/") ? (
+                  <img src={chat.icone} alt="Icone" style={{ width: '100%', height: '100%', borderRadius: '10px', objectFit: 'cover' }} />
+                ) : (
+                  chat.icone || "🔒"
+                )}
+              </div>
+              <div className="chat-item-info">
+                <span className="chat-item-title">{chat.nomeCustom || `Ninho Privado ${i + 1}`}</span>
+                <span className="chat-item-sub">Bate-Papo Seguro</span>
+              </div>
+              {chat.naoLida && <div className="unread-dot"></div>}
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      <main className="main-chat-area">
+        <header className="chat-header" style={{ display: 'flex', padding: '16px 20px', background: 'var(--chat-header-bg)', borderBottom: '1px solid var(--icon-color)', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <button className="hamburger-btn" onClick={() => setMenuAberto(true)}>☰</button>
+            
             {editandoNome === abaAtiva && !isLagoa && !ehChatDeAmigo ? (
-              <div style={{display: 'flex', gap: '8px'}}>
-                <input className="pro-input" value={nomePrivadoInput} onChange={e => setNomePrivadoInput(e.target.value)} style={{padding: '6px 10px'}} autoFocus onKeyDown={e => { if(e.key === 'Enter') { setPrivados(prev => prev.map(p => p.id === abaAtiva ? {...p, nomeCustom: nomePrivadoInput} : p)); setEditandoNome(null); } }} />
-                <button onClick={() => { setPrivados(prev => prev.map(p => p.id === abaAtiva ? {...p, nomeCustom: nomePrivadoInput} : p)); setEditandoNome(null); }} style={{background: 'var(--btn-gold-grad)', border: 'none', borderRadius: '8px', padding: '0 12px'}}>OK</button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <select 
+                  value={chatAtivoData?.icone?.startsWith("data:image/") ? "🔒" : chatAtivoData?.icone || "🔒"}
+                  onChange={(e) => setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, icone: e.target.value } : p))}
+                  style={{ background: 'var(--bg-input)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px', outline: 'none', fontSize: '18px', cursor: 'pointer' }}
+                >
+                  {["🔒", "🦆", "❤️", "🔥", "🚀", "🎮", "🎵", "⭐", "💼", "🍻", "😎", "👾", "🤖", "🍕"].map(emoji => (
+                    <option key={emoji} value={emoji}>{emoji}</option>
+                  ))}
+                </select>
+
+                <label style={{ cursor: 'pointer', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--icon-color)', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  🖼️ Foto
+                  <input type="file" accept="image/*" onChange={(e) => handleUploadIconeChat(e, abaAtiva)} style={{ display: 'none' }} />
+                </label>
+
+                <input 
+                  value={nomePrivadoInput} 
+                  onChange={(e) => setNomePrivadoInput(e.target.value)}
+                  onKeyDown={(e) => { 
+                    if (e.key === 'Enter') {
+                      setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
+                      setEditandoNome(null);
+                    }
+                  }}
+                  autoFocus
+                  style={{ background: 'var(--bg-input)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 10px', outline: 'none', fontSize: '16px', fontWeight: 'bold', maxWidth: '140px' }}
+                />
+                <button onClick={() => {
+                  setPrivados(prev => prev.map(p => p.id === abaAtiva ? { ...p, nomeCustom: nomePrivadoInput || p.nomeCustom } : p));
+                  setEditandoNome(null);
+                }} style={{background: 'var(--btn-gold-grad)', color: '#000', padding: '8px 12px', borderRadius: '6px', fontWeight: 'bold', border: 'none', cursor: 'pointer'}}>OK</button>
+                
+                <button onClick={() => {
+                  if(confirm("Tem certeza que deseja apagar e sair deste chat?")) {
+                    setPrivados(prev => prev.filter(p => p.id !== abaAtiva));
+                    setAbaAtiva("lagoa");
+                    setEditandoNome(null);
+                  }
+                }} style={{background: '#f43f5e', color: '#fff', padding: '8px 12px', borderRadius: '6px', fontWeight: 'bold', border: 'none', cursor: 'pointer', marginLeft: '6px'}} title="Apagar Chat Definitivamente">🗑️</button>
               </div>
             ) : (
-              <span className="chat-header-name">{isLagoa ? "Mergulho Anônimo" : (chatAtivoData?.nomeCustom || "Ninho Privado")}</span>
+              <span 
+                style={{ fontSize: "18px", fontWeight: "900", color: "var(--icon-color)", display: 'flex', alignItems: 'center', gap: '8px', letterSpacing: '0.5px' }}
+              >
+                {isLagoa ? "Mergulho Anônimo" : (
+                  <>
+                    <span 
+                      style={{ cursor: chatAtivoData?.amigoRef ? 'pointer' : 'default' }} 
+                      onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}
+                    >
+                      {chatAtivoData?.icone?.startsWith("data:image/") ? (
+                        <img src={chatAtivoData.icone} alt="Icone Chat" style={{ width: '28px', height: '28px', borderRadius: '8px', objectFit: 'cover' }} />
+                      ) : (
+                        chatAtivoData?.icone || "🔒"
+                      )}
+                    </span>
+                    <span 
+                      style={{ cursor: chatAtivoData?.amigoRef ? 'pointer' : 'default' }} 
+                      onClick={() => chatAtivoData?.amigoRef && setPerfilAmigoSelecionado(chatAtivoData.amigoRef)}
+                    >
+                      {chatAtivoData?.nomeCustom || "Ninho Privado"}
+                    </span>
+                  </>
+                )}
+                {!isLagoa && !ehChatDeAmigo && (
+                  <span 
+                    onClick={() => { setEditandoNome(abaAtiva); setNomePrivadoInput(chatAtivoData?.nomeCustom || `Ninho Privado`); }} 
+                    style={{fontSize: '14px', marginLeft: '4px', opacity: 0.5, cursor: 'pointer'}} 
+                    title="Editar Chat"
+                  >
+                    ✏️
+                  </span>
+                )}
+              </span>
             )}
           </div>
-          <div className="chat-icons">
-            {!isLagoa && !chamadaAtiva && <span onClick={solicitarChamadaVoz}>📞</span>}
-            {isLagoa && lagoaAtiva && <span onClick={solicitarPrivado} title="Mover p/ Privado">🔐</span>}
-            {isLagoa && lagoaAtiva && <span onClick={sairDaLagoa} title="Sair" style={{color: '#f43f5e'}}>🚪</span>}
+
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {!isLagoa && !chamadaAtiva && (
+              <button onClick={solicitarChamadaVoz} className="btn-call-start" style={{ padding: '8px 16px', background: 'rgba(35, 165, 89, 0.1)', color: '#23a559', border: '1px solid #23a559', borderRadius: '8px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                📞 <span className="hide-on-mobile">Ligar</span>
+              </button>
+            )}
+
+            {isLagoa && lagoaAtiva && (
+              <>
+                <button onClick={solicitarPrivado} style={{ padding: '8px 12px', background: 'var(--bg-input)', color: 'var(--icon-color)', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  <span className="hide-on-mobile">Puxar </span>🔐
+                </button>
+                <button onClick={sairDaLagoa} style={{ padding: '8px 12px', background: 'rgba(244, 63, 94, 0.1)', color: '#f43f5e', border: '1px solid #f43f5e', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  <span className="hide-on-mobile">Sair </span>🚪
+                </button>
+              </>
+            )}
           </div>
         </header>
 
-        {isLagoa && !lagoaAtiva && !procurando && !lagoaPendente && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-            <img src={lagoImgSrc} alt="Lagoa" style={{ width: '140px', marginBottom: '24px' }} />
-            <h2 style={{color: 'var(--text-main)', marginBottom: '20px'}}>Quem você busca?</h2>
-            <div style={{display: 'flex', flexWrap: 'wrap', maxWidth: '400px', justifyContent: 'center'}}>
-              {['qualquer', 'masculino', 'feminino', 'nao-binario'].map(val => (
-                <button key={val} className={`btn-lagoa ${preferenciasGenero.includes(val) ? 'active' : ''}`} onClick={() => togglePreferencia(val)}>
-                  {val.charAt(0).toUpperCase() + val.slice(1)}
+        <div className="chat-body" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          {isLagoa && lagoaAtiva && tempoRestante !== null && (
+            <div style={{
+              backgroundColor: tempoRestante <= 60 ? 'rgba(244, 63, 94, 0.2)' : 'var(--bg-input)',
+              border: `1px solid ${tempoRestante <= 60 ? '#f43f5e' : 'var(--border-color)'}`,
+              color: tempoRestante <= 60 ? '#f43f5e' : 'var(--icon-color)',
+              padding: '12px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold', margin: '12px 16px', borderRadius: '10px', transition: 'all 0.3s'
+            }}>
+              {tempoRestante <= 60 ? "⚠️ " : "⏳ "} A Lagoa fechará em {Math.floor(tempoRestante / 60)}:{(tempoRestante % 60).toString().padStart(2, '0')}. Puxe para o Privado!
+            </div>
+          )}
+
+          {chamadaAtiva && !isLagoa && (
+            <div className="discord-call-panel-v2">
+              <div className="d-call-info">
+                <div className="d-call-dot"></div>
+                <div className="d-call-text">
+                  <span className="d-call-title">Voz Conectada</span>
+                  <span className="d-call-subtitle">Ninho Privado</span>
+                </div>
+              </div>
+              <div className="d-call-actions">
+                <button onClick={() => setModalPerfilAberto(true)} className="d-action-btn hide-on-mobile">⚙️</button>
+                <button onClick={alternarMuteMicrofone} className={`d-action-btn ${microfoneMutado ? "btn-muted" : ""}`}>
+                  {microfoneMutado ? "🔇" : "🎙️"}
                 </button>
-              ))}
+                <button onClick={alternarAudioMutado} className={`d-action-btn ${audioMutado ? "btn-muted" : ""}`}>
+                  {audioMutado ? "🔕" : "🎧"}
+                </button>
+                <button onClick={desligarChamada} className="d-action-btn btn-disconnect"><span>☎️</span></button>
+              </div>
             </div>
-            <button onClick={procurarPato} style={{ marginTop: '24px', padding: '16px 32px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '99px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>ENTRAR NA ÁGUA 🚀</button>
-          </div>
-        )}
+          )}
 
-        {isLagoa && procurando && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: '60px', height: '60px', border: '4px solid var(--border-color)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-            <h3 style={{color: 'var(--text-main)', marginTop: '20px'}}>Procurando patos...</h3>
-            <button onClick={cancelarBusca} style={{ marginTop: '20px', background: 'transparent', color: '#f43f5e', border: '1px solid #f43f5e', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer' }}>Cancelar</button>
-          </div>
-        )}
+          {chamadaRecebida && !chamadaAtiva && !isLagoa && (
+            <div className="discord-call-panel-v2" style={{ borderLeft: '4px solid #23a559' }}>
+              <div className="d-call-info">
+                <div className="d-call-dot" style={{animation: 'pulse-green 1s infinite'}}></div>
+                <div className="d-call-text">
+                  <span className="d-call-title" style={{color: 'var(--text-main)'}}>Recebendo Chamada...</span>
+                  <span className="d-call-subtitle">O outro pato quer falar!</span>
+                </div>
+              </div>
+              <div className="d-call-actions">
+                <button onClick={atenderChamadaVoz} className="d-action-btn" style={{backgroundColor: '#23a559', color: '#fff'}}>📞</button>
+                <button onClick={recusarChamadaVoz} className="d-action-btn btn-muted">✖️</button>
+              </div>
+            </div>
+          )}
 
-        {isLagoa && lagoaPendente && !lagoaAtiva && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <h2 style={{color: 'var(--text-main)'}}>Pato Encontrado! ({confirmados}/2)</h2>
-            <div style={{display: 'flex', gap: '12px', marginTop: '20px'}}>
-              <button onClick={aceitarConexao} disabled={jaAceitou} style={{background: jaAceitou ? '#10b981' : 'var(--btn-blue-grad)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer'}}>
-                {jaAceitou ? "Aguardando..." : "Conectar 💚"}
+          {isLagoa && !lagoaAtiva && !lagoaPendente && !procurando && (
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px', background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-color)', maxWidth: '450px' }}>
+              <div className="duck-avatar" style={{ fontSize: '80px', marginBottom: '20px' }}>🎭</div>
+              <h2 style={{ fontSize: "28px", fontWeight: "900", color: "var(--text-main)", marginBottom: "12px" }}>Lagoa Secreta</h2>
+              <p style={{ color: "var(--text-muted)", fontSize: "15px", marginBottom: "32px", lineHeight: '1.5' }}>Mergulhe anonimamente. Você tem 6 minutos para conhecer alguém antes que a lagoa feche.</p>
+              
+              <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                <label className="pro-label" style={{ display: 'block', marginBottom: '12px' }}>COM QUEM VOCÊ QUER CONVERSAR?</label>
+                
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <button type="button" onClick={() => togglePreferencia('qualquer')} className={`pref-btn ${preferenciasGenero.includes('qualquer') ? 'active' : ''}`}>
+                    Qualquer Pessoa
+                  </button>
+                  <button type="button" onClick={() => togglePreferencia('masculino')} className={`pref-btn ${preferenciasGenero.includes('masculino') ? 'active' : ''}`}>
+                    Masculinos
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" onClick={() => togglePreferencia('feminino')} className={`pref-btn ${preferenciasGenero.includes('feminino') ? 'active' : ''}`}>
+                    Femininos
+                  </button>
+                  <button type="button" onClick={() => togglePreferencia('nao-binario')} className={`pref-btn ${preferenciasGenero.includes('nao-binario') ? 'active' : ''}`}>
+                    Não-Binários
+                  </button>
+                </div>
+              </div>
+
+              <button onClick={procurarPato} style={{ width: '100%', padding: '16px 32px', fontSize: '16px', fontWeight: '900', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>ENTRAR NA ÁGUA 🚀</button>
+            </div>
+          )}
+
+          {isLagoa && procurando && (
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px', background: 'var(--bg-card)', border: '1px solid var(--icon-color)', borderRadius: '16px', maxWidth: '400px', boxShadow: '0 0 20px rgba(0,0,0,0.1)' }}>
+              <div className="radar-spinner" style={{ margin: '0 auto 24px', width: '60px', height: '60px', border: '4px solid var(--border-color)', borderTopColor: 'var(--icon-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+              <h2 style={{ color: "var(--icon-color)", fontSize: '20px', marginBottom: '8px' }}>Procurando um Pato...</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '32px' }}>Aguardando alguém compatível pular na lagoa.</p>
+              
+              <button onClick={cancelarBusca} style={{ background: 'transparent', border: '1px solid #f43f5e', color: '#f43f5e', padding: '12px 24px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}>
+                Cancelar Busca ✖
               </button>
-              <button onClick={recusarConexao} style={{background: 'transparent', border: '1px solid #f43f5e', color: '#f43f5e', padding: '12px 24px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer'}}>Pular ❌</button>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="chat-messages">
-          {chamadaAtiva && (
-            <div className="d-call-panel">
-              <span style={{color: 'var(--text-main)', fontWeight: 'bold'}}>📞 Voz Conectada</span>
-              <div style={{display: 'flex', gap: '12px'}}>
-                <button onClick={alternarMuteMicrofone} className="d-action-btn" style={{background: microfoneMutado ? '#f43f5e' : 'var(--bg-input)', color: microfoneMutado ? '#fff' : 'var(--text-main)', border: '1px solid var(--border-color)'}}>{microfoneMutado ? "🔇" : "🎙️"}</button>
-                <button onClick={desligarChamada} className="d-action-btn" style={{background: '#f43f5e', color: '#fff', width: 'auto', padding: '0 16px', borderRadius: '24px'}}>Desligar ☎️</button>
+          {isLagoa && lagoaPendente && !lagoaAtiva && (
+            <div className="matching-card" style={{ margin: 'auto', textAlign: 'center', padding: '40px 20px', background: 'var(--bg-card)', border: '1px solid var(--icon-color)', borderRadius: '20px' }}>
+              <h2 style={{ color: "var(--text-main)", marginBottom: "12px", fontSize: '22px' }}>Pato Encontrado!</h2>
+              <div style={{ display: "inline-block", background: "var(--bg-input)", color: "var(--icon-color)", border: "1px solid var(--border-color)", padding: "6px 16px", borderRadius: "20px", fontSize: "13px", fontWeight: "bold", marginBottom: "20px" }}>
+                Confirmações: {confirmados}/2
+              </div>
+              <p style={{ color: "var(--text-muted)", marginBottom: "24px" }}>Deseja falar com <strong>{parceiroNomeAnon || "um Pato Anônimo"}</strong>?</p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '200px', margin: '0 auto' }}>
+                <button onClick={aceitarConexao} style={{ padding: '14px', background: jaAceitou ? '#10b981' : 'var(--btn-blue-grad)', color: '#fff', fontWeight: 'bold', border: 'none', borderRadius: '10px', cursor: jaAceitou ? 'default' : 'pointer' }} disabled={jaAceitou}>
+                  {jaAceitou ? "Aguardando... ⏳" : "Conectar! 💚"}
+                </button>
+                <button onClick={recusarConexao} style={{ padding: '14px', background: 'transparent', color: '#f43f5e', border: '1px solid #f43f5e', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>Pular ❌</button>
               </div>
             </div>
           )}
-          {chamadaRecebida && !chamadaAtiva && (
-            <div className="d-call-panel" style={{borderColor: '#10b981'}}>
-              <span style={{color: '#10b981', fontWeight: 'bold'}}>📞 Recebendo Ligação...</span>
-              <div style={{display: 'flex', gap: '12px'}}>
-                <button onClick={atenderChamadaVoz} className="d-action-btn" style={{background: '#10b981', color: '#fff'}}>✓</button>
-                <button onClick={recusarChamadaVoz} className="d-action-btn" style={{background: '#f43f5e', color: '#fff'}}>✕</button>
+
+          {((isLagoa && lagoaAtiva) || !isLagoa) && (
+            <>
+              {statusConvite && (
+                <div style={{ 
+                  background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-main)", 
+                  padding: "10px 16px", textAlign: "center", borderRadius: "10px", margin: "10px 16px",
+                  display: (!isLagoa && statusConvite.includes("Chamando")) ? "flex" : "block", 
+                  justifyContent: "space-between", alignItems: "center" 
+                }}>
+                  <span>{statusConvite}</span>
+                  {!isLagoa && statusConvite.includes("Chamando") && (
+                     <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "6px 12px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>Cancelar ✖</button>
+                  )}
+                </div>
+              )}
+
+              {isLagoa && convitePendente && (
+                <div style={{ background: "var(--bg-input)", border: "1px solid #10b981", padding: "16px", textAlign: "center", borderRadius: "16px", margin: "10px 16px" }}>
+                  <p style={{ color: "var(--text-main)", fontWeight: "bold", marginBottom: "12px" }}>🔒 {convitePendente} te convidou para o Privado!</p>
+                  <button onClick={() => responderConvite(true)} style={{ padding: '10px 16px', background: '#10b981', border: 'none', color: '#fff', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', marginRight: '10px' }}>Aceitar</button>
+                  <button onClick={() => responderConvite(false)} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid #f43f5e', color: '#f43f5e', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer' }}>Recusar</button>
+                </div>
+              )}
+
+              <div className="chat-messages" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
+                {msgsAtuais.map((msg) => {
+                  let nomeLimpo = msg.usuario;
+                  if (nomeLimpo.includes("data:image")) {
+                    const match = nomeLimpo.match(/([a-zA-Z0-9_ -]+#\d{4})/);
+                    if (match) nomeLimpo = match[1];
+                    else nomeLimpo = nomeLimpo.split(" ").pop() || "Pato";
+                  }
+                  nomeLimpo = nomeLimpo.replace(/^[^\w\s]+/, '').trim();
+
+                  const eSistema = nomeLimpo.includes("SISTEMA");
+                  
+                  const eMinha = !eSistema && (
+                    isLagoa ? msg.usuario === meuNomeAnon : (nomeLimpo.includes(`#${minhaTag}`) || nomeLimpo.includes(meuNomeReal))
+                  );
+
+                  let avatarMsg = "🦆";
+                  if (isLagoa) {
+                    avatarMsg = eSistema ? "🤖" : "🎭";
+                  } else {
+                    if (eSistema) avatarMsg = "🤖";
+                    else if (eMinha) avatarMsg = meuAvatar;
+                    else avatarMsg = chatAtivoData?.amigoRef?.avatar || chatAtivoData?.icone || "🦆";
+                  }
+
+                  return (
+                    <div 
+                      key={msg.id} 
+                      style={{ 
+                        display: 'flex', 
+                        gap: '12px', 
+                        marginBottom: '12px', 
+                        alignItems: 'flex-start',
+                        flexDirection: eMinha && !eSistema ? 'row-reverse' : 'row',
+                        justifyContent: eMinha && !eSistema ? 'flex-start' : 'flex-start'
+                      }}
+                    >
+                      {/* Avatar */}
+                      <div 
+                        onClick={() => { if(!eMinha && !isLagoa && !eSistema && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef); }}
+                        style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'transparent', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0, overflow: 'hidden', cursor: !eMinha && chatAtivoData?.amigoRef ? 'pointer' : 'default' }}
+                      >
+                        {avatarMsg.startsWith("data:image/") ? (
+                          <img src={avatarMsg} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          avatarMsg
+                        )}
+                      </div>
+
+                      {/* Balão e Nome */}
+                      <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '75%', alignItems: eMinha && !eSistema ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '2px' }}>
+                          <span 
+                            onClick={() => { if(!eMinha && !isLagoa && !eSistema && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef); }}
+                            style={{ fontWeight: 'bold', fontSize: '13px', color: eMinha ? 'var(--icon-color)' : 'var(--text-main)', cursor: !eMinha && chatAtivoData?.amigoRef ? 'pointer' : 'default' }}
+                          >
+                            {nomeLimpo}
+                          </span>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{msg.hora}</span>
+                        </div>
+                        
+                        <div className={`chat-bubble ${eMinha ? 'me' : 'other'}`} style={{ 
+                          background: eMinha ? 'var(--bubble-me)' : 'var(--bubble-other)', 
+                          color: eMinha ? (isDark ? '#000' : 'var(--text-main)') : 'var(--text-main)', 
+                          padding: '10px 14px', 
+                          borderRadius: eMinha ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                          fontSize: '14px',
+                          wordBreak: 'break-word',
+                          boxShadow: eMinha ? 'var(--chat-glow)' : 'none'
+                        }}>
+                          {msg.mensagem}
+                          {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{ maxWidth: "250px", borderRadius: "8px", marginTop: "8px", display: 'block' }} />}
+                          {msg.audio && <audio src={msg.audio} controls style={{ marginTop: "8px", maxWidth: "100%", height: '36px', display: 'block' }} />}
+                        </div>
+
+                        {eMinha && !eSistema && (
+                          <button onClick={() => apagarMensagem(msg.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', fontSize: '11px', cursor: 'pointer', marginTop: '2px' }}>
+                            🗑️ apagar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
               </div>
-            </div>
+
+              <div style={{ padding: '16px', background: 'transparent', borderTop: '1px solid var(--icon-color)', marginTop: 'auto' }}>
+                {imagemBase64 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px', borderRadius: '8px', marginBottom: '10px', border: '1px solid var(--border-color)' }}>
+                    <img src={imagemBase64} alt="Preview" style={{ height: '40px', borderRadius: '4px' }} />
+                    <button onClick={() => setImagemBase64(null)} style={{ background: "none", border: "none", color: "#f43f5e", cursor: "pointer", marginLeft: "auto", fontWeight: 'bold' }}>✕ Remover Foto</button>
+                  </div>
+                )}
+                <form onSubmit={enviarMensagem} style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'var(--chat-input-bar-bg)', border: '1.5px solid var(--icon-color)', borderRadius: '99px', padding: '8px 16px' }}>
+                  {!isLagoa && (
+                    <label style={{ cursor: 'pointer', fontSize: '20px', color: 'var(--icon-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
+                    </label>
+                  )}
+                  <button type="button" onClick={alternarGravacaoAudioMsg} style={{ background: 'transparent', border: 'none', color: gravandoAudioMsg ? '#f43f5e' : 'var(--icon-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer' }}>
+                    {gravandoAudioMsg ? "🛑" : "🎙️"}
+                  </button>
+                  <input type="text" placeholder={gravandoAudioMsg ? "Gravando áudio..." : "Conversar no Ninho..."} value={texto} onChange={(e) => setTexto(e.target.value)} disabled={gravandoAudioMsg} style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text-main)', outline: 'none', fontSize: '15px' }} />
+                  <button type="submit" style={{ background: 'transparent', color: 'var(--icon-color)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', cursor: 'pointer', fontWeight: 'bold' }}>➤</button>
+                </form>
+              </div>
+            </>
           )}
-          
-          {((isLagoa && lagoaAtiva) || !isLagoa) && msgsAtuais.map(msg => {
-            const eMinha = msg.usuario === (isLagoa ? meuNomeAnon : `${meuNomeReal}#${minhaTag}`);
-            const eSistema = msg.usuario.includes("SISTEMA");
-            return (
-              <div key={msg.id} className={`chat-bubble ${eMinha ? 'me' : 'other'}`} style={{ alignSelf: eSistema ? 'center' : (eMinha ? 'flex-end' : 'flex-start'), background: eSistema ? 'var(--bg-input)' : '', color: eSistema ? 'var(--text-main)' : '', border: eSistema ? '1px solid var(--border-color)' : '' }}>
-                {!eMinha && !eSistema && <div style={{fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', opacity: 0.7}}>{msg.usuario}</div>}
-                {msg.mensagem}
-                {msg.imagem && <img src={msg.imagem} style={{maxWidth: '100%', borderRadius: '8px', marginTop: '8px'}}/>}
-                {msg.audio && <audio src={msg.audio} controls style={{marginTop: '8px', width: '100%'}}/>}
-                <div style={{fontSize: '10px', textAlign: 'right', marginTop: '4px', opacity: 0.5}}>{msg.hora}</div>
-              </div>
-            );
-          })}
-          <div ref={messagesEndRef} />
         </div>
+      </main>
 
-        {((isLagoa && lagoaAtiva) || !isLagoa) && (
-          <div className="chat-input-area">
-            {imagemBase64 && (
-              <div style={{display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px', borderRadius: '12px', marginBottom: '8px', border: '1px solid var(--border-color)'}}>
-                <img src={imagemBase64} style={{height: '40px', borderRadius: '4px'}} />
-                <span onClick={() => setImagemBase64(null)} style={{cursor: 'pointer', color: '#f43f5e', fontWeight: 'bold', marginLeft: 'auto'}}>✕ Remover</span>
+      {/* MODAL DE PERFIL DO AMIGO */}
+      {perfilAmigoSelecionado && (
+        <div onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'var(--bg-card)', borderRadius: '20px', width: '100%', maxWidth: '350px', border: '1px solid var(--border-color)', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)', position: 'relative' }}>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', background: 'var(--bg-gradient)' }}>
+              <button onClick={() => setPerfilAmigoSelecionado(null)} style={{ position: 'absolute', top: '16px', right: '20px', background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '20px', cursor: 'pointer' }}>✖</button>
+              
+              <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '50px', border: '3px solid var(--icon-color)', overflow: 'hidden' }}>
+                {perfilAmigoSelecionado.avatar && perfilAmigoSelecionado.avatar.startsWith("data:image/") ? (
+                  <img src={perfilAmigoSelecionado.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  perfilAmigoSelecionado.avatar || "🦆"
+                )}
               </div>
-            )}
-            <form onSubmit={enviarMensagem} className="chat-input-bar">
-              <label style={{ cursor: 'pointer', color: 'var(--icon-color)', marginRight: '10px' }}>
-                📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-              </label>
-              <button type="button" onClick={alternarGravacaoAudioMsg} style={{ background: 'transparent', border: 'none', color: gravandoAudioMsg ? '#f43f5e' : 'var(--icon-color)', fontSize: '18px', cursor: 'pointer' }}>
-                {gravandoAudioMsg ? "🛑" : "🎙️"}
-              </button>
-              <input type="text" placeholder={gravandoAudioMsg ? "Gravando áudio..." : "Digite uma mensagem..."} value={texto} onChange={e => setTexto(e.target.value)} disabled={gravandoAudioMsg} />
-              <button type="submit" style={{ background: 'transparent', border: 'none', color: 'var(--icon-color)', fontSize: '20px', cursor: 'pointer' }}>➤</button>
-            </form>
+              
+              <div style={{ textAlign: 'center' }}>
+                <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '900', color: 'var(--text-main)' }}>{perfilAmigoSelecionado.name}</h2>
+                <span style={{ fontSize: '14px', color: 'var(--icon-color)', fontFamily: 'monospace', fontWeight: 'bold' }}>#{perfilAmigoSelecionado.tag}</span>
+              </div>
+
+              <div style={{ background: 'var(--bg-input)', width: '100%', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '14px', fontStyle: 'italic' }}>"{perfilAmigoSelecionado.bio || 'Mergulhando no lago...'}"</p>
+                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                  IDENTIDADE: <span style={{ color: 'var(--text-main)' }}>{perfilAmigoSelecionado.gender || 'Prefere não dizer'}</span>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIGURAÇÕES */}
+      {modalPerfilAberto && (
+        <div onClick={fecharModalPerfil} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'var(--bg-card)', borderRadius: '20px', width: '100%', maxWidth: '400px', maxHeight: '90vh', border: '1px solid var(--border-color)', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px' }}>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>⚙️ Configurações</h3>
+                <button onClick={fecharModalPerfil} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '24px', cursor: 'pointer' }}>✖</button>
+              </div>
+              <div style={{ display: 'flex' }}>
+                <button onClick={() => setAbaConfig('perfil')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'perfil' ? 'var(--icon-color)' : 'var(--text-muted)', fontWeight: 'bold', borderBottom: abaConfig === 'perfil' ? '2px solid var(--icon-color)' : '2px solid transparent', cursor: 'pointer' }}>👤 Perfil</button>
+                <button onClick={() => setAbaConfig('audio')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'audio' ? 'var(--icon-color)' : 'var(--text-muted)', fontWeight: 'bold', borderBottom: abaConfig === 'audio' ? '2px solid var(--icon-color)' : '2px solid transparent', cursor: 'pointer' }}>🎙️ Áudio</button>
+                <button onClick={() => setAbaConfig('notificacoes')} style={{ flex: 1, padding: '12px 0', background: 'transparent', border: 'none', color: abaConfig === 'notificacoes' ? 'var(--icon-color)' : 'var(--text-muted)', fontWeight: 'bold', borderBottom: abaConfig === 'notificacoes' ? '2px solid var(--icon-color)' : '2px solid transparent', cursor: 'pointer' }}>🔔 Alertas</button>
+              </div>
+            </div>
+            
+            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px', background: 'var(--bg-gradient)' }}>
+              
+              {abaConfig === 'perfil' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">NOME DE EXIBIÇÃO</label>
+                    <input type="text" value={meuNomeReal} onChange={(e) => setMeuNomeReal(e.target.value)} className="pro-input" />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">TAG DO USUÁRIO</label>
+                    <input type="text" value={`#${minhaTag}`} disabled className="pro-input" style={{ opacity: 0.6, cursor: 'not-allowed' }} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">GÊNERO / IDENTIDADE</label>
+                    <select value={meuGenero} onChange={(e) => setMeuGenero(e.target.value)} className="pro-input" style={{ cursor: 'pointer' }}>
+                      <option value="prefiro-nao-dizer">Prefiro não dizer</option>
+                      <option value="masculino">Masculino</option>
+                      <option value="feminino">Feminino</option>
+                      <option value="nao-binario">Não-Binário</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">STATUS/BIO</label>
+                    <input type="text" value={meuStatusBio} onChange={(e) => setMeuStatusBio(e.target.value)} maxLength={50} className="pro-input" />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label className="pro-label">AVATAR DO PERFIL</label>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {["🦆", "🦅", "🦉", "🐧", "👑", "🚀"].map((emoji) => (
+                        <span key={emoji} onClick={() => setMeuAvatar(emoji)} className={`avatar-btn ${meuAvatar === emoji ? 'active' : ''}`}>{emoji}</span>
+                      ))}
+
+                      <label style={{ cursor: 'pointer', padding: '10px 14px', borderRadius: '14px', background: meuAvatar.startsWith("data:image/") ? 'rgba(45, 212, 191, 0.15)' : 'var(--bg-input)', border: meuAvatar.startsWith("data:image/") ? '1px solid var(--icon-color)' : '1px solid var(--border-color)', color: 'var(--icon-color)', fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        📷 Foto da Galeria
+                        <input type="file" accept="image/*" onChange={handleUploadMeuAvatar} style={{ display: 'none' }} />
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
+                     <button onClick={toggleTheme} className="theme-toggle-btn">
+                       Alternar para Tema {isDark ? "Claro ☀️" : "Escuro 🌙"}
+                     </button>
+                  </div>
+                </div>
+              )}
+
+              {abaConfig === 'audio' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <label className="pro-label">VOLUME DE SAÍDA (ALTO-FALANTE)</label>
+                    <span style={{ fontSize: '12px', color: 'var(--icon-color)', fontWeight: 'bold' }}>{volumeSaida}%</span>
+                  </div>
+                  <input type="range" min="0" max="100" value={volumeSaida} onChange={(e) => setVolumeSaida(Number(e.target.value))} className="discord-slider" />
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
+                    <label className="pro-label">GANHO DO MICROFONE (ENTRADA)</label>
+                    <span style={{ fontSize: '12px', color: '#f43f5e', fontWeight: 'bold' }}>{ganhoMicrofone}%</span>
+                  </div>
+                  <input type="range" min="0" max="200" value={ganhoMicrofone} onChange={(e) => setGanhoMicrofone(Number(e.target.value))} className="discord-slider" />
+
+                  <button type="button" onClick={alternarTesteMic} className={`btn-test-mic ${testandoMic ? 'active' : ''}`} style={{ marginTop: '10px' }}>
+                    {testandoMic ? '🛑 Parar Teste' : '🎙️ Ouvir meu microfone'}
+                  </button>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5', marginTop: '8px' }}>Use o botão acima para testar o ganho do seu microfone e a altura do seu alto-falante simultaneamente.</p>
+                </div>
+              )}
+
+              {abaConfig === 'notificacoes' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1, paddingRight: '16px' }}>
+                      <label className="pro-label" style={{ display: 'block', marginBottom: '4px' }}>NOTIFICAÇÕES DE ÁREA DE TRABALHO</label>
+                      <span style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.4', display: 'block' }}>
+                        Receba um alerta na tela do seu dispositivo quando receber mensagens, convites ou ligações enquanto não estiver com a aba do chat aberta.
+                      </span>
+                    </div>
+                    
+                    <button 
+                      onClick={handleToggleNotificacoes}
+                      style={{
+                        width: '52px', height: '28px', borderRadius: '14px',
+                        background: permiteNotificacoes ? '#10b981' : 'var(--bg-input)',
+                        position: 'relative', cursor: 'pointer', transition: 'background 0.3s',
+                        flexShrink: 0, border: '1px solid var(--border-color)'
+                      }}
+                    >
+                      <div style={{
+                        width: '22px', height: '22px', borderRadius: '50%', background: '#fff',
+                        position: 'absolute', top: '2px', left: permiteNotificacoes ? '26px' : '2px',
+                        transition: 'left 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }} />
+                    </button>
+                  </div>
+                  
+                  {permiteNotificacoes && (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', padding: '12px', borderRadius: '8px', color: '#10b981', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
+                      ✅ O DuckZone está autorizado a enviar notificações.
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+            <div style={{ padding: '20px 24px', borderTop: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
+              <button onClick={fecharModalPerfil} style={{ width: '100%', padding: '16px', background: 'var(--btn-blue-grad)', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: '900', cursor: 'pointer', fontSize: '15px' }}>
+                SALVAR E FECHAR 💾
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE AMIGOS */}
+      {modalAmigosAberto && (
+        <div onClick={() => setModalAmigosAberto(false)} style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(8px)', zIndex: 1000, padding: '16px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'var(--bg-card)', borderRadius: '20px', width: '100%', maxWidth: '450px', minHeight: '400px', maxHeight: '80vh', border: '1px solid var(--border-color)', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px' }}>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '900' }}>🦆 Amigos</h3>
+                <button onClick={() => setModalAmigosAberto(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '24px', cursor: 'pointer' }}>✖</button>
+              </div>
+              <div style={{ display: 'flex' }}>
+                <button onClick={() => setAbaAmigos('add')} style={{ flex: 1, padding: '12px', background: 'transparent', border: 'none', color: abaAmigos === 'add' ? 'var(--icon-color)' : 'var(--text-muted)', fontWeight: 'bold', borderBottom: abaAmigos === 'add' ? '2px solid var(--icon-color)' : '2px solid transparent', cursor: 'pointer' }}>Adicionar</button>
+                <button onClick={() => setAbaAmigos('pending')} style={{ flex: 1, padding: '12px', background: 'transparent', border: 'none', color: abaAmigos === 'pending' ? 'var(--icon-color)' : 'var(--text-muted)', fontWeight: 'bold', borderBottom: abaAmigos === 'pending' ? '2px solid var(--icon-color)' : '2px solid transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                  Pendentes {listaPendentes.length > 0 && <span style={{ background: '#f43f5e', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', color: '#fff' }}>{listaPendentes.length}</span>}
+                </button>
+                <button onClick={() => setAbaAmigos('list')} style={{ flex: 1, padding: '12px', background: 'transparent', border: 'none', color: abaAmigos === 'list' ? 'var(--icon-color)' : 'var(--text-muted)', fontWeight: 'bold', borderBottom: abaAmigos === 'list' ? '2px solid var(--icon-color)' : '2px solid transparent', cursor: 'pointer' }}>Meus Amigos</button>
+              </div>
+            </div>
+            
+            <div style={{ padding: '24px', flex: 1, overflowY: 'auto', background: 'var(--bg-gradient)' }}>
+              {abaAmigos === 'add' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>Digite a Tag do pato. Ex: <strong>Pato#0000</strong></p>
+                  <form onSubmit={enviarConviteAmizade} style={{ display: 'flex', gap: '8px' }}>
+                    <input type="text" placeholder="Nome#Tag" value={amigoTagInput} onChange={(e) => setAmigoTagInput(e.target.value)} className="pro-input" required style={{ flex: 1 }} />
+                    <button type="submit" style={{ padding: '0 20px', background: 'var(--btn-blue-grad)', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', color: '#fff' }}>Enviar</button>
+                  </form>
+                  {amigoMensagem && <div style={{ color: amigoMensagem.includes('✅') ? '#10b981' : '#f43f5e', fontSize: '14px', fontWeight: 'bold', textAlign: 'center', background: amigoMensagem.includes('✅') ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)', padding: '12px', borderRadius: '8px' }}>{amigoMensagem}</div>}
+                </div>
+              )}
+
+              {abaAmigos === 'pending' && (
+                <div>
+                  {listaPendentes.length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>Nenhum convite pendente. 🦗</p>
+                  ) : (
+                    listaPendentes.map((req) => (
+                      <div key={req.id} className="friend-card" style={{ cursor: 'default' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div className="friend-avatar-wrap">
+                            {req.sender.avatar && req.sender.avatar.startsWith("data:image/") ? (
+                              <img src={req.sender.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              req.sender.avatar || "🦆"
+                            )}
+                          </div>
+                          <div className="friend-info">
+                            <div className="friend-name">{req.sender.name}</div>
+                            <div style={{ marginTop: '4px' }}>
+                              <span className="friend-tag">#{req.sender.tag}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button className="btn-accept" onClick={() => responderConviteAmizade(req.id, 'ACCEPT')}>✓</button>
+                          <button className="btn-reject" onClick={() => responderConviteAmizade(req.id, 'REJECT')}>✕</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {abaAmigos === 'list' && (
+                <div>
+                  {listaAmigosAceitos.length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>Você ainda não tem amigos na lagoa. 🦆😢</p>
+                  ) : (
+                    listaAmigosAceitos.map((amizade) => {
+                      const amigo = amizade.senderId === meuIdBanco ? amizade.receiver : amizade.sender;
+                      return (
+                        <div key={amizade.id} className="friend-card" onClick={() => iniciarChatComAmigo(amizade.id)}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <div className="friend-avatar-wrap">
+                              {amigo.avatar && amigo.avatar.startsWith("data:image/") ? (
+                                <img src={amigo.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                amigo.avatar || "🦆"
+                              )}
+                            </div>
+                            <div className="friend-info">
+                              <div className="friend-name">
+                                {amigo.name}
+                              </div>
+                              <div style={{ marginTop: '4px' }}>
+                                <span className="friend-tag">#{amigo.tag}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="chat-action-btn">
+                            💬
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

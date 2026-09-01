@@ -2,7 +2,7 @@
 
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import "../theme.css";
+import "./theme.css";
 
 export default function Home() {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
