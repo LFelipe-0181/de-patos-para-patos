@@ -62,7 +62,6 @@ export default function ChatPage() {
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
   const [menuMensagemAberto, setMenuMensagemAberto] = useState<string | null>(null);
   
-  // NOVO ESTADO: Armazena qual mensagem estamos respondendo
   const [respondendoA, setRespondendoA] = useState<{ id: string, usuario: string, texto: string } | null>(null);
 
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
@@ -802,7 +801,6 @@ export default function ChatPage() {
     e.preventDefault();
     if (!texto.trim() && !imagemBase64) return;
     
-    // Concatena a resposta se houver
     let msgFinal = texto;
     if (respondendoA) {
        msgFinal = `[Respondendo ${respondendoA.usuario}: ${respondendoA.texto.substring(0, 30)}${respondendoA.texto.length > 30 ? '...' : ''}]\n\n${texto}`;
@@ -869,7 +867,6 @@ export default function ChatPage() {
         .chat-messages { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
         .chat-bubble { padding: 10px 14px; font-size: 14px; box-shadow: var(--chat-glow); line-height: 1.45; word-break: break-word; }
         
-        /* 🦆 MENU DE OPÇÕES (3 PONTINHOS) CORRIGIDO 🦆 */
         .chat-bubble-wrapper { display: flex; gap: 12px; align-items: flex-end; width: 100%; position: relative; }
         .msg-options-container { position: relative; display: flex; align-items: center; justify-content: center; }
         .msg-dots-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 4px; opacity: 0; transition: opacity 0.2s ease; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
@@ -881,11 +878,9 @@ export default function ChatPage() {
         .msg-dropdown-btn:hover { background: var(--bg-input); }
         .msg-dropdown-btn.danger { color: #f43f5e; }
 
-        /* 🦆 CAIXA DE TEXTO (INPUT) E REPLY BOX 🦆 */
         .chat-input-area { padding: 16px 24px; background: transparent; display: flex; flex-direction: column; align-items: center; }
         .reply-box { width: 100%; max-width: 800px; display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--border-color); border-bottom: none; border-radius: 16px 16px 0 0; padding: 12px 16px; margin-bottom: -16px; z-index: 5; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); }
         .chat-input-bar { width: 100%; max-width: 800px; display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 99px; padding: 12px 20px; background: var(--bg-input); box-shadow: 0 4px 15px rgba(0,0,0,0.05); z-index: 10; position: relative; }
-        /* Quando está respondendo, removemos o raio superior do input para encaixar na reply box */
         .chat-input-bar.is-replying { border-radius: 0 0 16px 16px; }
         
         .chat-input-bar input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-main); margin-left: 12px; font-size: 15px; }
@@ -910,7 +905,6 @@ export default function ChatPage() {
 
         .hamburger-btn { display: none; background: transparent; border: none; color: var(--icon-color); font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
         
-        /* 🦆 CORREÇÃO DO SPINNER "PROCURANDO PATOS..." 🦆 */
         .search-spinner { 
           width: 60px; height: 60px; 
           border: 4px solid var(--border-color); 
@@ -1199,12 +1193,11 @@ export default function ChatPage() {
               else avatarMsg = chatAtivoData?.amigoRef?.avatar || chatAtivoData?.icone || "🦆";
             }
 
-            // Checa se a mensagem é uma resposta
             const isReply = msg.mensagem.startsWith("[Respondendo");
             let replyInfo = null;
             let msgContent = msg.mensagem;
             if (isReply) {
-              const match = msg.mensagem.match(/\[Respondendo (.*?): (.*?)\]\n\n(.*)/s);
+              const match = msg.mensagem.match(/\[Respondendo (.*?): (.*?)\]\n\n([\s\S]*)/);
               if (match) {
                 replyInfo = { user: match[1], text: match[2] };
                 msgContent = match[3];
@@ -1246,7 +1239,6 @@ export default function ChatPage() {
                       border: eSistema ? '1px solid var(--border-color)' : '' 
                     }}>
                       
-                      {/* CAIXA DE MENSAGEM RESPONDIDA */}
                       {replyInfo && (
                         <div style={{ 
                           background: 'rgba(0,0,0,0.1)', 
@@ -1317,13 +1309,12 @@ export default function ChatPage() {
         {((isLagoa && lagoaAtiva) || !isLagoa) && (
           <div className="chat-input-area">
             {imagemBase64 && (
-              <div style={{display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px', borderRadius: '12px', marginBottom: '8px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '800px'}}>
-                <img src={imagemBase64} style={{height: '40px', borderRadius: '4px'}} />
-                <span onClick={() => setImagemBase64(null)} style={{cursor: 'pointer', color: '#f43f5e', fontWeight: 'bold', marginLeft: 'auto'}}>✕ Remover</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px 16px', borderRadius: '16px', marginBottom: '12px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '800px' }}>
+                <img src={imagemBase64} style={{ height: '40px', borderRadius: '4px' }} />
+                <span onClick={() => setImagemBase64(null)} style={{ cursor: 'pointer', color: '#f43f5e', fontWeight: 'bold', marginLeft: 'auto' }}>✕ Remover Foto</span>
               </div>
             )}
             
-            {/* ✅ CAIXA DE "RESPONDENDO A..." */}
             {respondendoA && (
               <div className="reply-box">
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
