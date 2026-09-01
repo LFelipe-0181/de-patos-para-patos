@@ -847,8 +847,13 @@ export default function ChatPage() {
         .rail-btn-duck { width: 28px; height: 28px; object-fit: contain; }
         
         .chat-sidebar { width: 340px; background-color: rgba(255, 255, 255, 0.2); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s ease; z-index: 15; backdrop-filter: blur(5px); flex-shrink: 0; }
+        
+        /* 🦆 CABEÇALHO DO MENU LATERAL E BOTÃO DE FECHAR 🦆 */
         .sidebar-header-area { padding: 20px 16px 10px; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin: 0; }
+        .sidebar-close-btn { display: none; background: transparent; border: none; color: var(--text-main); font-size: 24px; cursor: pointer; padding: 0; line-height: 1; opacity: 0.7; }
+        .sidebar-close-btn:hover { opacity: 1; }
+
         .sidebar-scroll { flex: 1; overflow-y: auto; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 8px; }
         
         .friend-item-btn { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background-color: var(--bg-input); border: 1px solid var(--border-color); font-size: 14px; font-weight: 600; color: var(--text-main); cursor: pointer; transition: transform 0.15s; }
@@ -892,7 +897,7 @@ export default function ChatPage() {
         
         .d-call-panel { background: var(--bg-input); border: 1px solid var(--border-color); margin: 12px 24px; padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
         .d-action-btn { width: 40px; height: 40px; border-radius: 50%; border: none; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .pro-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); outline: none; }
+        .pro-input { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); outline: none; font-size: 14px; }
         
         .lagoa-card-container { position: relative; background-color: var(--lagoa-card-bg); border: 1px solid var(--lagoa-border); border-radius: 16px; padding: 40px 24px 24px; max-width: 420px; width: 100%; text-align: center; margin-top: 50px; box-shadow: 0px 15px 40px rgba(0,0,0,0.3); }
         .lagoa-top-img { position: absolute; top: -45px; left: 50%; transform: translateX(-50%); width: 110px; z-index: 10; }
@@ -915,9 +920,6 @@ export default function ChatPage() {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ========================================= */
-        /* 📱 MOBILE RESPONSIVE (BOTTOM NAV BAR) 📱 */
-        /* ========================================= */
         @media (max-width: 768px) {
           .app-layout { 
             flex-direction: column; 
@@ -955,6 +957,7 @@ export default function ChatPage() {
           }
           .hamburger-btn { display: block; }
           .menu-overlay.open { display: block; z-index: 90; }
+          .sidebar-close-btn { display: block; }
           
           .chat-bubble-wrapper:hover .msg-dots-btn,
           .msg-dots-btn {
@@ -984,7 +987,10 @@ export default function ChatPage() {
       <div className={`chat-sidebar ${menuAberto ? 'open' : ''}`}>
         {abaChat === "grupos" && (
           <>
-            <div className="sidebar-header-area"><h3 className="sidebar-title">Ninhos & Lagoas</h3></div>
+            <div className="sidebar-header-area">
+              <h3 className="sidebar-title">Ninhos & Lagoas</h3>
+              <button className="sidebar-close-btn" onClick={() => setMenuAberto(false)}>✖</button>
+            </div>
             <div className="sidebar-scroll">
               <div className={`friend-item-btn ${isLagoa ? "active" : ""}`} onClick={() => { setAbaAtiva("lagoa"); setMenuAberto(false); setLagoaNaoLida(false); }}>
                 <span style={{fontSize: '20px'}}>🌊</span> Lagoa Pública
@@ -1007,36 +1013,43 @@ export default function ChatPage() {
           <>
             <div className="sidebar-header-area">
               <h3 className="sidebar-title">Amigos</h3>
-              <button onClick={() => setAbaAmigos(prev => prev === 'add' ? 'list' : 'add')} style={{ background: 'var(--btn-gold-grad)', color: '#000', border: 'none', padding: '6px 12px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>
-                {abaAmigos === 'add' ? "Ver Lista" : "+ Add"}
-              </button>
+              <button className="sidebar-close-btn" onClick={() => setMenuAberto(false)}>✖</button>
             </div>
+            
             <div className="sidebar-scroll">
+              {/* 🦆 MENU DE PÍLULAS ESTILIZADO 🦆 */}
+              <div style={{ display: 'flex', backgroundColor: 'var(--bg-input)', padding: '6px', borderRadius: '16px', marginBottom: '20px', border: '1px solid var(--border-color)', gap: '4px' }}>
+                <button onClick={() => setAbaAmigos('add')} style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', background: abaAmigos === 'add' ? 'var(--btn-blue-grad)' : 'transparent', color: abaAmigos === 'add' ? '#fff' : 'var(--text-main)', transition: '0.2s' }}>Add</button>
+                <button onClick={() => setAbaAmigos('pending')} style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', background: abaAmigos === 'pending' ? 'var(--btn-blue-grad)' : 'transparent', color: abaAmigos === 'pending' ? '#fff' : 'var(--text-main)', transition: '0.2s' }}>Pendentes</button>
+                <button onClick={() => setAbaAmigos('list')} style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', background: abaAmigos === 'list' ? 'var(--btn-blue-grad)' : 'transparent', color: abaAmigos === 'list' ? '#fff' : 'var(--text-main)', transition: '0.2s' }}>Lista</button>
+              </div>
+
               {abaAmigos === 'add' ? (
-                <form onSubmit={enviarConviteAmizade} style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
-                  <span style={{fontSize: '12px', color: 'var(--text-muted)'}}>Adicionar por Tag (Ex: Pato#1234)</span>
+                <form onSubmit={enviarConviteAmizade} style={{display: 'flex', flexDirection: 'column', gap: '12px', background: 'var(--bg-input)', padding: '20px', borderRadius: '20px', border: '1px solid var(--border-color)'}}>
+                  <span style={{fontSize: '14px', color: 'var(--text-main)', fontWeight: 'bold', textAlign: 'center'}}>Convidar Novo Pato</span>
                   <input className="pro-input" value={amigoTagInput} onChange={(e) => setAmigoTagInput(e.target.value)} placeholder="Nome#Tag" required />
-                  <button type="submit" style={{padding: '10px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold'}}>Enviar Convite</button>
-                  {amigoMensagem && <div style={{fontSize: '12px', color: 'var(--text-main)', marginTop: '8px', textAlign: 'center'}}>{amigoMensagem}</div>}
-                  
-                  {listaPendentes.length > 0 && (
-                    <div style={{marginTop: '16px'}}>
-                      <span style={{fontSize: '13px', fontWeight: 'bold', color: 'var(--text-main)'}}>Pendentes:</span>
-                      {listaPendentes.map(req => (
-                        <div key={req.id} style={{display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-input)', borderRadius: '8px', marginTop: '8px', border: '1px solid var(--border-color)'}}>
-                          <span style={{color: 'var(--text-main)', fontSize: '13px', display: 'flex', alignItems: 'center'}}>{req.sender.name}</span>
-                          <div style={{display: 'flex', gap: '4px'}}>
-                            <button onClick={() => responderConviteAmizade(req.id, 'ACCEPT')} style={{background: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', width: '24px', height: '24px', cursor: 'pointer'}}>✓</button>
-                            <button onClick={() => responderConviteAmizade(req.id, 'REJECT')} style={{background: '#f43f5e', color: '#fff', border: 'none', borderRadius: '4px', width: '24px', height: '24px', cursor: 'pointer'}}>✕</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <button type="submit" style={{padding: '14px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', marginTop: '4px'}}>Enviar Convite 🚀</button>
+                  {amigoMensagem && <div style={{fontSize: '13px', color: 'var(--text-main)', marginTop: '8px', textAlign: 'center', background: 'rgba(0,0,0,0.05)', padding: '10px', borderRadius: '8px'}}>{amigoMensagem}</div>}
                 </form>
+              ) : abaAmigos === 'pending' ? (
+                <div>
+                  {listaPendentes.length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px', fontSize: '13px' }}>Nenhum convite pendente. 🦗</p>
+                  ) : (
+                    listaPendentes.map(req => (
+                      <div key={req.id} style={{display: 'flex', justifyContent: 'space-between', padding: '12px 16px', background: 'var(--bg-input)', borderRadius: '16px', marginBottom: '12px', border: '1px solid var(--border-color)'}}>
+                        <span style={{color: 'var(--text-main)', fontSize: '14px', display: 'flex', alignItems: 'center', fontWeight: 'bold'}}>{req.sender.name}</span>
+                        <div style={{display: 'flex', gap: '8px'}}>
+                          <button onClick={() => responderConviteAmizade(req.id, 'ACCEPT')} style={{background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer', fontSize: '16px'}}>✓</button>
+                          <button onClick={() => responderConviteAmizade(req.id, 'REJECT')} style={{background: '#f43f5e', color: '#fff', border: 'none', borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer', fontSize: '16px'}}>✕</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               ) : (
                 listaAmigosAceitos.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '20px', fontSize: '13px' }}>Você ainda não tem amigos. 🦆</p>
+                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px', fontSize: '13px' }}>Você ainda não tem amigos. 🦆</p>
                 ) : (
                   listaAmigosAceitos.map((amizade) => {
                     const amigo = amizade.senderId === meuIdBanco ? amizade.receiver : amizade.sender;
@@ -1054,25 +1067,28 @@ export default function ChatPage() {
 
         {abaChat === "config" && (
           <>
-            <div className="sidebar-header-area"><h3 className="sidebar-title">Configurações</h3></div>
+            <div className="sidebar-header-area">
+              <h3 className="sidebar-title">Configurações</h3>
+              <button className="sidebar-close-btn" onClick={() => setMenuAberto(false)}>✖</button>
+            </div>
             <div className="sidebar-scroll" style={{ paddingBottom: '30px' }}>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                  <label className="pro-label">Nome de Exibição</label>
                  <input className="pro-input" value={meuNomeReal} onChange={e => setMeuNomeReal(e.target.value)} placeholder="Nome" />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                  <label className="pro-label">Sua Tag</label>
                  <input className="pro-input" value={`#${minhaTag}`} disabled style={{opacity: 0.6}} />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
                  <label className="pro-label">Status / Bio</label>
                  <input className="pro-input" value={meuStatusBio} onChange={e => setMeuStatusBio(e.target.value)} placeholder="Status/Bio" />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
                  <label className="pro-label">Gênero</label>
                  <select className="pro-input" value={meuGenero} onChange={e => setMeuGenero(e.target.value)}>
                    <option value="prefiro-nao-dizer">Prefiro não dizer</option>
@@ -1082,15 +1098,15 @@ export default function ChatPage() {
                  </select>
               </div>
 
-              <button onClick={fecharModalPerfil} style={{padding: '12px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '16px'}}>
+              <button onClick={fecharModalPerfil} style={{padding: '16px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '24px'}}>
                 Salvar Alterações
               </button>
               
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <button onClick={toggleTheme} style={{padding: '12px', background: 'var(--bg-input)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer'}}>
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <button onClick={toggleTheme} style={{padding: '16px', background: 'var(--bg-input)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '16px', fontWeight: 'bold', cursor: 'pointer'}}>
                   Tema: {isDark ? "Escuro 🌙" : "Claro ☀️"}
                 </button>
-                <button onClick={handleToggleNotificacoes} style={{padding: '12px', background: permiteNotificacoes ? '#10b981' : 'var(--bg-input)', color: permiteNotificacoes ? '#fff' : 'var(--text-main)', border: `1px solid ${permiteNotificacoes ? '#10b981' : 'var(--border-color)'}`, borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer'}}>
+                <button onClick={handleToggleNotificacoes} style={{padding: '16px', background: permiteNotificacoes ? '#10b981' : 'var(--bg-input)', color: permiteNotificacoes ? '#fff' : 'var(--text-main)', border: `1px solid ${permiteNotificacoes ? '#10b981' : 'var(--border-color)'}`, borderRadius: '16px', fontWeight: 'bold', cursor: 'pointer'}}>
                   Notificações {permiteNotificacoes ? "ON ✅" : "OFF ❌"}
                 </button>
               </div>
