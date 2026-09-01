@@ -130,7 +130,7 @@ export default function ChatPage() {
     }
   };
 
-  // ✅ CORREÇÃO: Sistema Reserva se o Banco (Prisma) falhar e não mandar o Nome
+  // Garante a Tag caso banco falhe
   useEffect(() => {
     if (session?.user) {
       const email = session.user.email || `${session.user.name?.toLowerCase().replace(/\s+/g, '')}@duckzone.local`;
@@ -150,7 +150,6 @@ export default function ChatPage() {
             if (data.bio) setMeuStatusBio(data.bio);
             if (data.gender) setMeuGenero(data.gender);
           } else {
-            // SE O BANCO DEU ERRO, PUXA DO GOOGLE PRA NÃO FICAR O #0000
             setMeuNomeReal(session?.user?.name || "Pato Logado");
             setMinhaTag(session?.user?.email?.length.toString().padStart(4, '0') || "2629");
           }
@@ -680,7 +679,6 @@ export default function ChatPage() {
     setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null); setLagoaNaoLida(false);
   };
 
-  // ✅ CORREÇÃO DO BOTÃO LIGAR: Agora com proteção anti-crash e garantindo que o status mostre!
   const solicitarChamadaVoz = () => {
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
     if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
@@ -829,8 +827,8 @@ export default function ChatPage() {
         .rail-btn.active { background: var(--btn-blue-grad); color: #fff; border-color: transparent; }
         .rail-btn-duck { width: 28px; height: 28px; object-fit: contain; }
         
-        /* 2. MENU LATERAL (AMIGOS/GRUPOS/CONFIG) */
-        .chat-sidebar { width: 280px; background-color: rgba(255, 255, 255, 0.2); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s; z-index: 15; backdrop-filter: blur(5px); }
+        /* 2. MENU LATERAL (AGORA MAIS LARGO: 340px) */
+        .chat-sidebar { width: 340px; background-color: rgba(255, 255, 255, 0.2); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s; z-index: 15; backdrop-filter: blur(5px); }
         .sidebar-header-area { padding: 20px 16px 10px; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin: 0; }
         .sidebar-scroll { flex: 1; overflow-y: auto; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 8px; }
@@ -870,7 +868,7 @@ export default function ChatPage() {
         .d-action-btn { width: 40px; height: 40px; border-radius: 50%; border: none; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .pro-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); outline: none; }
         
-        /* 🦆 NOVO VISUAL DA LAGOA PÚBLICA (IDÊNTICO AO PRINT) 🦆 */
+        /* 🦆 NOVO VISUAL DA LAGOA PÚBLICA (COM O REFLEXO 3D EXATO) 🦆 */
         .lagoa-card-container {
           position: relative;
           background-color: var(--lagoa-card-bg);
@@ -898,12 +896,13 @@ export default function ChatPage() {
           margin-bottom: 24px;
         }
         .lagoa-btn {
-          background: transparent;
-          border: 1px solid rgba(0,0,0,0.1);
+          background: var(--lagoa-btn-bg);
+          border: 1px solid rgba(255,255,255,0.2);
           border-radius: 99px;
           padding: 12px 4px;
           color: var(--lagoa-text);
-          font-size: 13px;
+          font-size: 14px;
+          font-weight: 600;
           cursor: pointer;
           box-shadow: var(--lagoa-btn-shadow);
           transition: all 0.2s ease;
@@ -913,7 +912,8 @@ export default function ChatPage() {
         }
         .lagoa-btn.active {
           box-shadow: var(--lagoa-btn-shadow-active);
-          border-color: var(--lagoa-border);
+          border-color: rgba(0,0,0,0.05);
+          background: rgba(0,0,0,0.02);
           font-weight: 800;
         }
         .lagoa-footer-text {
@@ -1092,7 +1092,7 @@ export default function ChatPage() {
           </div>
         </header>
 
-        {/* ✅ AVISO DE CHAMADA FLUTUANTE (NUNCA SUMIRÁ) */}
+        {/* ✅ AVISO DE CHAMADA FLUTUANTE */}
         {((isLagoa && lagoaAtiva) || !isLagoa) && statusConvite && (
           <div style={{ 
             position: 'absolute', top: '80px', left: '50%', transform: 'translateX(-50%)',
