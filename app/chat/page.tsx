@@ -872,13 +872,15 @@ export default function ChatPage() {
         .chat-messages { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
         .chat-bubble { padding: 10px 14px; font-size: 14px; box-shadow: var(--chat-glow); line-height: 1.45; word-break: break-word; }
         
-        .chat-bubble-wrapper { display: flex; gap: 12px; align-items: flex-end; width: 100%; position: relative; }
-        .msg-options-container { position: relative; display: flex; align-items: center; justify-content: center; }
-        .msg-dots-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 4px; opacity: 0; transition: opacity 0.2s ease; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
+        /* 🦆 MENU DE OPÇÕES (3 PONTINHOS) - AGORA COLADO NO BALÃO 🦆 */
+        .chat-bubble-wrapper { display: flex; gap: 4px; align-items: flex-end; width: 100%; position: relative; }
+        
+        .msg-options-container { position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+        .msg-dots-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 0; opacity: 0; transition: all 0.2s ease; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }
         .chat-bubble-wrapper:hover .msg-dots-btn { opacity: 1; }
         .msg-dots-btn:hover { background: rgba(0,0,0,0.1); color: var(--text-main); }
         
-        .msg-dropdown { position: absolute; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; display: flex; flex-direction: column; min-width: 140px; overflow: hidden; padding: 6px 0; }
+        .msg-dropdown { position: absolute; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; display: flex; flex-direction: column; min-width: 130px; overflow: hidden; padding: 4px 0; }
         .msg-dropdown-btn { background: transparent; border: none; padding: 10px 16px; text-align: left; color: var(--text-main); font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; gap: 8px; align-items: center; }
         .msg-dropdown-btn:hover { background: var(--bg-input); }
         .msg-dropdown-btn.danger { color: #f43f5e; }
@@ -969,9 +971,14 @@ export default function ChatPage() {
           .menu-overlay.open { display: block; z-index: 100; }
           .sidebar-close-btn { display: block; }
           
+          /* No mobile deixamos o botão visível mas suave (0.5 opacity) */
           .chat-bubble-wrapper:hover .msg-dots-btn,
           .msg-dots-btn {
-            opacity: 1; 
+            opacity: 0.5; 
+          }
+          .msg-dots-btn:active {
+            opacity: 1;
+            background: rgba(0,0,0,0.1);
           }
           
           .lagoa-card-container {
@@ -1301,7 +1308,7 @@ export default function ChatPage() {
                   </div>
                 )}
 
-                <div style={{ display: 'flex', flexDirection: eMinha ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', maxWidth: '75%' }}>
+                <div style={{ display: 'flex', flexDirection: eMinha ? 'row-reverse' : 'row', alignItems: 'center', gap: '4px', maxWidth: '75%' }}>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: eMinha && !eSistema ? 'flex-end' : 'flex-start' }}>
                     {!eMinha && !eSistema && <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', opacity: 0.7 }}>{nomeLimpo}</div>}
@@ -1340,7 +1347,7 @@ export default function ChatPage() {
                       <button className="msg-dots-btn" onClick={() => setMenuMensagemAberto(menuMensagemAberto === msg.id ? null : msg.id)}>⋮</button>
                       
                       {menuMensagemAberto === msg.id && (
-                        <div className="msg-dropdown" style={eMinha ? { right: '100%', marginRight: '8px', bottom: '0' } : { left: '100%', marginLeft: '8px', bottom: '0' }}>
+                        <div className="msg-dropdown" style={eMinha ? { right: '0', top: '100%', marginTop: '4px' } : { left: '0', top: '100%', marginTop: '4px' }}>
                           
                           <button className="msg-dropdown-btn" onClick={() => { 
                             setRespondendoA({ id: msg.id, usuario: nomeLimpo, texto: msgContent });
