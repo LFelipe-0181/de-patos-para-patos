@@ -839,7 +839,6 @@ export default function ChatPage() {
         ::-webkit-scrollbar-thumb:hover { background: var(--icon-color); }
         * { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, 0.2) transparent; }
 
-        /* ✅ 100dvh para funcionar bem nos navegadores mobile e não esconder a barra de baixo */
         .app-layout { display: flex; flex-direction: row; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; background: var(--bg-gradient); color: var(--text-main); font-family: -apple-system, sans-serif; }
         
         .chat-icon-rail { width: 68px; background-color: rgba(0, 0, 0, 0.08); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 16px; z-index: 20; flex-shrink: 0; }
@@ -863,16 +862,27 @@ export default function ChatPage() {
         .status-dot.online { background-color: #10b981; } .status-dot.offline { background-color: #9ca3af; }
         
         .chat-main-area { flex: 1; display: flex; flex-direction: column; justify-content: space-between; position: relative; min-width: 0; background: transparent; }
-        .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: var(--chat-header-bg); border-bottom: 1px solid var(--border-color); }
+        
+        /* 🦆 CABEÇALHO (HEADER) IGUAL AO PRINT 🦆 */
+        .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: transparent; border-bottom: 1px solid var(--border-color); }
         .chat-header-user { display: flex; align-items: center; gap: 12px; }
-        .chat-avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid var(--icon-color); color: var(--icon-color); cursor: pointer; background: var(--bg-input); }
-        .chat-header-name { font-size: 18px; font-weight: 700; color: var(--text-main); }
-        .chat-icons { display: flex; gap: 18px; font-size: 20px; color: var(--icon-color); cursor: pointer; }
         
+        .back-arrow-btn { background: transparent; border: none; color: var(--icon-color); cursor: pointer; padding: 0; display: flex; align-items: center; margin-right: 8px; transition: 0.2s; }
+        .back-arrow-btn:hover { opacity: 0.7; }
+
+        .chat-avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; border: 2px solid var(--icon-color); color: var(--icon-color); cursor: pointer; background: transparent; overflow: hidden; }
+        .chat-header-name { font-size: 18px; font-weight: 500; color: var(--text-main); letter-spacing: 0.5px; }
+        
+        .chat-icons { display: flex; gap: 20px; color: var(--icon-color); cursor: pointer; align-items: center; }
+        .icon-top { width: 24px; height: 24px; stroke: currentColor; stroke-width: 2; fill: none; opacity: 0.9; transition: 0.2s; }
+        .icon-top:hover { opacity: 1; transform: scale(1.1); }
+        
+        /* 🦆 BALÕES COM RABINHO 🦆 */
         .chat-messages { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
-        .chat-bubble { padding: 10px 14px; font-size: 14px; box-shadow: var(--chat-glow); line-height: 1.45; word-break: break-word; }
+        .chat-bubble { padding: 12px 18px; font-size: 15px; box-shadow: var(--chat-glow); line-height: 1.45; word-break: break-word; border: none !important; }
+        .chat-bubble.me { background-color: var(--bubble-me) !important; color: #000 !important; border-radius: 20px 0 20px 20px !important; }
+        .chat-bubble.other { background-color: var(--bubble-other) !important; color: #000 !important; border-radius: 0 20px 20px 20px !important; }
         
-        /* 🦆 MENU DE OPÇÕES (3 PONTINHOS) - AGORA COLADO NO BALÃO 🦆 */
         .chat-bubble-wrapper { display: flex; gap: 4px; align-items: flex-end; width: 100%; position: relative; }
         
         .msg-options-container { position: relative; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
@@ -885,12 +895,19 @@ export default function ChatPage() {
         .msg-dropdown-btn:hover { background: var(--bg-input); }
         .msg-dropdown-btn.danger { color: #f43f5e; }
 
-        .chat-input-area { padding: 16px 24px; background: transparent; display: flex; flex-direction: column; align-items: center; }
+        /* 🦆 CAIXA DE TEXTO REDONDA (PILL) 🦆 */
+        .chat-input-area { padding: 16px 20px; background: transparent; display: flex; flex-direction: column; align-items: center; }
         .reply-box { width: 100%; max-width: 800px; display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--border-color); border-bottom: none; border-radius: 16px 16px 0 0; padding: 12px 16px; margin-bottom: -16px; z-index: 5; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); }
-        .chat-input-bar { width: 100%; max-width: 800px; display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 99px; padding: 12px 20px; background: var(--bg-input); box-shadow: 0 4px 15px rgba(0,0,0,0.05); z-index: 10; position: relative; }
-        .chat-input-bar.is-replying { border-radius: 0 0 16px 16px; }
         
-        .chat-input-bar input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-main); margin-left: 12px; font-size: 15px; }
+        .chat-input-bar { width: 100%; display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 99px; padding: 10px 16px; background: transparent; z-index: 10; position: relative; }
+        .chat-input-bar.is-replying { border-radius: 0 0 16px 16px; background: var(--bg-input); }
+        
+        .chat-input-bar input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-main); margin: 0 12px; font-size: 15px; }
+        .chat-input-bar input::placeholder { color: var(--text-muted); opacity: 0.8; }
+        
+        .icon-btn-input { background: transparent; border: none; color: var(--icon-color); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; transition: 0.2s; }
+        .icon-btn-input:hover { opacity: 0.7; }
+        .icon-svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 2; fill: none; }
         
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
         .modal-card { background: var(--bg-card); width: 100%; max-width: 400px; border-radius: 20px; border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column; max-height: 85vh; }
@@ -910,86 +927,26 @@ export default function ChatPage() {
         .lagoa-footer-text { font-size: 11px; color: var(--lagoa-text); line-height: 1.4; opacity: 0.8; margin: 0; }
         .lagoa-card-container p, .lagoa-card-container h2 { color: var(--lagoa-text) !important; }
 
-        .hamburger-btn { display: none; background: transparent; border: none; color: var(--icon-color); font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
-        
-        .search-spinner { 
-          width: 60px; height: 60px; 
-          border: 5px solid var(--border-color); 
-          border-top-color: transparent !important; 
-          border-radius: 50%; 
-          animation: spin 1s linear infinite; 
-          margin: 0 auto 20px;
-        }
+        .search-spinner { width: 60px; height: 60px; border: 5px solid var(--border-color); border-top-color: transparent !important; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ========================================= */
-        /* 📱 MOBILE RESPONSIVE (BOTTOM NAV BAR) 📱 */
-        /* ========================================= */
         @media (max-width: 768px) {
-          .app-layout { 
-            display: block; 
-          }
-          .chat-icon-rail {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 60px;
-            flex-direction: row;
-            border-right: none;
-            border-top: 1px solid var(--border-color);
-            padding: 0;
-            justify-content: space-evenly;
-            background: var(--bg-card);
-            z-index: 100;
-          }
-          .chat-main-area {
-            position: absolute;
-            top: 0;
-            left: 0;
-            height: 100dvh;
-            width: 100%;
-            padding-bottom: 60px;
-            box-sizing: border-box;
-          }
-          .chat-sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: calc(100dvh - 60px);
-            width: 85vw;
-            max-width: 320px;
-            transform: translateX(-100%);
-            z-index: 105;
-            background: var(--bg-gradient);
-            box-shadow: 5px 0 25px rgba(0,0,0,0.5);
-          }
-          .chat-sidebar.open {
-            transform: translateX(0);
-          }
-          .hamburger-btn { display: block; }
+          .app-layout { display: block; }
+          .chat-icon-rail { position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; flex-direction: row; border-right: none; border-top: 1px solid var(--border-color); padding: 0; justify-content: space-evenly; background: var(--bg-card); z-index: 100; }
+          .chat-main-area { position: absolute; top: 0; left: 0; height: 100dvh; width: 100%; padding-bottom: 60px; box-sizing: border-box; }
+          .chat-sidebar { position: fixed; top: 0; left: 0; height: calc(100dvh - 60px); width: 85vw; max-width: 320px; transform: translateX(-100%); z-index: 105; background: var(--bg-gradient); box-shadow: 5px 0 25px rgba(0,0,0,0.5); }
+          .chat-sidebar.open { transform: translateX(0); }
+          
+          .back-arrow-btn { display: flex; } /* Botão de voltar visível no mobile */
+          
           .menu-overlay.open { display: block; z-index: 100; }
           .sidebar-close-btn { display: block; }
           
-          /* No mobile deixamos o botão visível mas suave (0.5 opacity) */
-          .chat-bubble-wrapper:hover .msg-dots-btn,
-          .msg-dots-btn {
-            opacity: 0.5; 
-          }
-          .msg-dots-btn:active {
-            opacity: 1;
-            background: rgba(0,0,0,0.1);
-          }
+          .chat-bubble-wrapper:hover .msg-dots-btn, .msg-dots-btn { opacity: 0.5; }
+          .msg-dots-btn:active { opacity: 1; background: rgba(0,0,0,0.1); }
           
-          .lagoa-card-container {
-            padding: 40px 16px 20px;
-            margin-top: 30px;
-            max-width: 90%;
-          }
-          .lagoa-btn {
-            font-size: 12px;
-            padding: 10px 4px;
-          }
+          .lagoa-card-container { padding: 40px 16px 20px; margin-top: 30px; max-width: 90%; }
+          .lagoa-btn { font-size: 12px; padding: 10px 4px; }
         }
       `}} />
 
@@ -1132,11 +1089,16 @@ export default function ChatPage() {
       </div>
 
       <div className="chat-main-area">
+        
+        {/* 🦆 HEADER IGUAL AO DO PRINT 🦆 */}
         <header className="chat-header">
           <div className="chat-header-user">
-            <button className="hamburger-btn" onClick={() => setMenuAberto(!menuAberto)}>
-              {menuAberto ? "✖" : "☰"}
+            
+            {/* SETA DE VOLTAR (MOBILE/DESKTOP) */}
+            <button className="back-arrow-btn" onClick={() => setMenuAberto(!menuAberto)}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
+            
             <div className="chat-avatar" onClick={() => { if(!isLagoa && !ehChatDeAmigo) setEditandoNome(abaAtiva); }}>
               {isLagoa ? "🌊" : (chatAtivoData?.icone && chatAtivoData.icone.startsWith("data:") ? <img src={chatAtivoData.icone} style={{width:'100%', height:'100%', borderRadius:'50%'}}/> : (chatAtivoData?.icone || "👤"))}
             </div>
@@ -1150,65 +1112,45 @@ export default function ChatPage() {
               <span className="chat-header-name">{isLagoa ? "Mergulho Anônimo" : (chatAtivoData?.nomeCustom || "Ninho Privado")}</span>
             )}
           </div>
+          
           <div className="chat-icons">
-            {!isLagoa && !chamadaAtiva && <span onClick={solicitarChamadaVoz}>📞</span>}
+            {(!isLagoa && !chamadaAtiva) && (
+              <span onClick={solicitarChamadaVoz}>
+                <svg className="icon-top" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/></svg>
+              </span>
+            )}
+            
+            {(!isLagoa) && (
+              <span title="Compartilhar Tela (Em Breve)">
+                 <svg className="icon-top" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8M12 17v4"/></svg>
+              </span>
+            )}
+            
             {isLagoa && lagoaAtiva && <span onClick={solicitarPrivado} title="Mover p/ Privado">🔐</span>}
             {isLagoa && lagoaAtiva && <span onClick={sairDaLagoa} title="Sair" style={{color: '#f43f5e'}}>🚪</span>}
           </div>
         </header>
 
         {((isLagoa && lagoaAtiva) || !isLagoa) && statusConvite && (
-          <div style={{ 
-            position: 'absolute', top: '80px', left: '50%', transform: 'translateX(-50%)',
-            background: "var(--btn-blue-grad)", border: "1px solid var(--border-color)", color: "#fff", 
-            padding: "12px 24px", textAlign: "center", borderRadius: "99px", zIndex: 999,
-            display: "flex", justifyContent: "space-between", alignItems: "center", gap: '16px',
-            boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
-          }}>
+          <div style={{ position: 'absolute', top: '80px', left: '50%', transform: 'translateX(-50%)', background: "var(--btn-blue-grad)", border: "1px solid var(--border-color)", color: "#fff", padding: "12px 24px", textAlign: "center", borderRadius: "99px", zIndex: 999, display: "flex", justifyContent: "space-between", alignItems: "center", gap: '16px', boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
             <span style={{ fontWeight: 'bold', fontSize: '15px' }}>{statusConvite}</span>
-            {!isLagoa && statusConvite.includes("Chamando") && (
-               <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "99px", fontWeight: 'bold', cursor: "pointer" }}>Desligar ✖</button>
-            )}
+            {!isLagoa && statusConvite.includes("Chamando") && ( <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "99px", fontWeight: 'bold', cursor: "pointer" }}>Desligar ✖</button> )}
           </div>
         )}
 
         {isLagoa && !lagoaAtiva && !procurando && !lagoaPendente && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-            
             <div className="lagoa-card-container">
               <img src={lagoImgSrc} alt="Lagoa" className="lagoa-top-img" />
-              
-              <p style={{ fontSize: '15px', marginBottom: '32px', fontWeight: '500' }}>
-                Selecione que tipo de pessoa deseja encontrar na lagoa.
-              </p>
-              
+              <p style={{ fontSize: '15px', marginBottom: '32px', fontWeight: '500' }}>Selecione que tipo de pessoa deseja encontrar na lagoa.</p>
               <div className="lagoa-grid">
-                {[
-                  { label: 'Homens', val: 'masculino' },
-                  { label: 'Mulheres', val: 'feminino' },
-                  { label: 'Não Binários', val: 'nao-binario' },
-                  { label: 'Transgêneros', val: 'transgenero' },
-                  { label: 'Gênero Fluido', val: 'genero-fluido' },
-                  { label: 'Qualquer pessoa', val: 'qualquer' }
-                ].map(item => (
-                  <button 
-                    key={item.val} 
-                    className={`lagoa-btn ${preferenciasGenero.includes(item.val) ? 'active' : ''}`} 
-                    onClick={() => togglePreferencia(item.val)}
-                  >
-                    {item.label}
-                  </button>
+                {[ { label: 'Homens', val: 'masculino' }, { label: 'Mulheres', val: 'feminino' }, { label: 'Não Binários', val: 'nao-binario' }, { label: 'Transgêneros', val: 'transgenero' }, { label: 'Gênero Fluido', val: 'genero-fluido' }, { label: 'Qualquer pessoa', val: 'qualquer' } ].map(item => (
+                  <button key={item.val} className={`lagoa-btn ${preferenciasGenero.includes(item.val) ? 'active' : ''}`} onClick={() => togglePreferencia(item.val)}>{item.label}</button>
                 ))}
               </div>
-
-              <p className="lagoa-footer-text">
-                Caso tenha selecionado "prefiro não informar" você será encontrado como<br/>"qualquer pessoa".
-              </p>
+              <p className="lagoa-footer-text">Caso tenha selecionado "prefiro não informar" você será encontrado como<br/>"qualquer pessoa".</p>
             </div>
-
-            <button onClick={procurarPato} style={{ marginTop: '24px', padding: '16px 40px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '99px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
-              MERGULHAR 🚀
-            </button>
+            <button onClick={procurarPato} style={{ marginTop: '24px', padding: '16px 40px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '99px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>MERGULHAR 🚀</button>
           </div>
         )}
 
@@ -1225,9 +1167,7 @@ export default function ChatPage() {
             <h2 style={{color: 'var(--text-main)'}}>Pato Encontrado!</h2>
             <div style={{ background: 'var(--bg-input)', padding: '6px 16px', borderRadius: '20px', border: '1px solid var(--border-color)', color: 'var(--icon-color)', fontWeight: 'bold', margin: '16px 0' }}>Confirmados: {confirmados}/2</div>
             <div style={{display: 'flex', gap: '12px', marginTop: '10px'}}>
-              <button onClick={aceitarConexao} disabled={jaAceitou} style={{background: jaAceitou ? '#10b981' : 'var(--btn-blue-grad)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer'}}>
-                {jaAceitou ? "Aguardando..." : "Conectar 💚"}
-              </button>
+              <button onClick={aceitarConexao} disabled={jaAceitou} style={{background: jaAceitou ? '#10b981' : 'var(--btn-blue-grad)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer'}}>{jaAceitou ? "Aguardando..." : "Conectar 💚"}</button>
               <button onClick={recusarConexao} style={{background: 'var(--bg-input)', border: '1px solid #f43f5e', color: '#f43f5e', padding: '12px 24px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer'}}>Pular ❌</button>
             </div>
           </div>
@@ -1286,100 +1226,41 @@ export default function ChatPage() {
             }
 
             return (
-              <div key={msg.id} className="chat-bubble-wrapper" style={{ 
-                flexDirection: eMinha && !eSistema ? 'row-reverse' : 'row',
-                justifyContent: eSistema ? 'center' : 'flex-start' 
-              }}>
-                
-                {!eSistema && (
-                  <div 
-                    onClick={() => { if(!eMinha && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef); }}
-                    style={{ 
-                      width: '36px', height: '36px', borderRadius: '50%', background: 'transparent', border: '1px solid var(--border-color)', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0, overflow: 'hidden', 
-                      cursor: !eMinha && chatAtivoData?.amigoRef ? 'pointer' : 'default' 
-                    }}
-                  >
-                    {avatarMsg.startsWith("data:image/") ? (
-                      <img src={avatarMsg} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      avatarMsg
-                    )}
-                  </div>
+              <div key={msg.id} className="chat-bubble-wrapper" style={{ flexDirection: eMinha && !eSistema ? 'row-reverse' : 'row', justifyContent: eSistema ? 'center' : 'flex-start' }}>
+                {!eSistema && !eMinha && (
+                  <div style={{ fontSize: '12px', fontWeight: 'bold', position: 'absolute', top: '-18px', left: '52px', opacity: 0.7 }}>{nomeLimpo}</div>
                 )}
+                
+                {/* REMOVIDO: O Avatar das mensagens (pedido nas imagens não ter foto em cada bolha) */}
 
                 <div style={{ display: 'flex', flexDirection: eMinha ? 'row-reverse' : 'row', alignItems: 'center', gap: '4px', maxWidth: '75%' }}>
                   
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: eMinha && !eSistema ? 'flex-end' : 'flex-start' }}>
-                    {!eMinha && !eSistema && <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', opacity: 0.7 }}>{nomeLimpo}</div>}
-                    
-                    <div className={`chat-bubble ${eMinha ? 'me' : 'other'}`} style={{ 
-                      background: eSistema ? 'var(--bg-input)' : (eMinha ? 'var(--bubble-me)' : 'var(--bubble-other)'), 
-                      color: eSistema ? 'var(--text-main)' : (eMinha ? (isDark ? '#fff' : 'var(--text-main)') : 'var(--text-main)'), 
-                      borderRadius: eMinha ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                      border: eSistema ? '1px solid var(--border-color)' : '' 
-                    }}>
-                      
+                    <div className={`chat-bubble ${eMinha ? 'me' : 'other'}`}>
                       {replyInfo && (
-                        <div style={{ 
-                          background: 'rgba(0,0,0,0.1)', 
-                          borderLeft: '4px solid var(--icon-color)', 
-                          padding: '6px 10px', 
-                          borderRadius: '4px', 
-                          marginBottom: '8px',
-                          fontSize: '12px'
-                        }}>
-                          <span style={{ fontWeight: 'bold', display: 'block', color: eMinha && isDark ? '#fff' : 'var(--icon-color)' }}>{replyInfo.user}</span>
+                        <div style={{ background: 'rgba(0,0,0,0.1)', borderLeft: '4px solid var(--icon-color)', padding: '6px 10px', borderRadius: '4px', marginBottom: '8px', fontSize: '12px' }}>
+                          <span style={{ fontWeight: 'bold', display: 'block', color: eMinha && isDark ? '#000' : 'var(--icon-color)' }}>{replyInfo.user}</span>
                           <span style={{ opacity: 0.8 }}>{replyInfo.text}</span>
                         </div>
                       )}
-
                       {msgContent}
-                      
                       {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{maxWidth: '100%', borderRadius: '8px', marginTop: '8px'}}/>}
                       {msg.audio && <audio src={msg.audio} controls style={{marginTop: '8px', width: '100%'}}/>}
-                      <div style={{fontSize: '10px', textAlign: 'right', marginTop: '4px', opacity: 0.5}}>{msg.hora}</div>
                     </div>
                   </div>
 
                   {!eSistema && (
                     <div className="msg-options-container" onClick={(e) => e.stopPropagation()}>
                       <button className="msg-dots-btn" onClick={() => setMenuMensagemAberto(menuMensagemAberto === msg.id ? null : msg.id)}>⋮</button>
-                      
                       {menuMensagemAberto === msg.id && (
                         <div className="msg-dropdown" style={eMinha ? { right: '0', top: '100%', marginTop: '4px' } : { left: '0', top: '100%', marginTop: '4px' }}>
-                          
-                          <button className="msg-dropdown-btn" onClick={() => { 
-                            setRespondendoA({ id: msg.id, usuario: nomeLimpo, texto: msgContent });
-                            setMenuMensagemAberto(null); 
-                          }}>
-                            ↩ Responder
-                          </button>
-                          
-                          {eMinha && (
-                            <button className="msg-dropdown-btn" onClick={() => { 
-                              setTexto(msgContent); 
-                              apagarMensagem(msg.id); 
-                              setMenuMensagemAberto(null); 
-                            }}>
-                              ✏️ Editar
-                            </button>
-                          )}
-                          
-                          {eMinha && (
-                            <button className="msg-dropdown-btn danger" onClick={() => { 
-                              apagarMensagem(msg.id); 
-                              setMenuMensagemAberto(null); 
-                            }}>
-                              🗑️ Apagar
-                            </button>
-                          )}
-                          
+                          <button className="msg-dropdown-btn" onClick={() => { setRespondendoA({ id: msg.id, usuario: nomeLimpo, texto: msgContent }); setMenuMensagemAberto(null); }}>↩ Responder</button>
+                          {eMinha && (<button className="msg-dropdown-btn" onClick={() => { setTexto(msgContent); apagarMensagem(msg.id); setMenuMensagemAberto(null); }}>✏️ Editar</button>)}
+                          {eMinha && (<button className="msg-dropdown-btn danger" onClick={() => { apagarMensagem(msg.id); setMenuMensagemAberto(null); }}>🗑️ Apagar</button>)}
                         </div>
                       )}
                     </div>
                   )}
-
                 </div>
               </div>
             );
@@ -1390,7 +1271,7 @@ export default function ChatPage() {
         {((isLagoa && lagoaAtiva) || !isLagoa) && (
           <div className="chat-input-area">
             {imagemBase64 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px 16px', borderRadius: '16px', marginBottom: '12px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '800px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px 16px', borderRadius: '16px', marginBottom: '12px', border: '1px solid var(--border-color)', width: '100%' }}>
                 <img src={imagemBase64} style={{ height: '40px', borderRadius: '4px' }} />
                 <span onClick={() => setImagemBase64(null)} style={{ cursor: 'pointer', color: '#f43f5e', fontWeight: 'bold', marginLeft: 'auto' }}>✕ Remover Foto</span>
               </div>
@@ -1406,15 +1287,33 @@ export default function ChatPage() {
               </div>
             )}
 
+            {/* 🦆 BARRA DE DIGITAR IGUAL AO PRINT (Pill shape fina) 🦆 */}
             <form onSubmit={enviarMensagem} className={`chat-input-bar ${respondendoA ? 'is-replying' : ''}`}>
-              <label style={{ cursor: 'pointer', color: 'var(--icon-color)', marginRight: '10px', display: 'flex', alignItems: 'center' }}>
-                📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+              
+              <label className="icon-btn-input">
+                <svg className="icon-svg" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
               </label>
-              <button type="button" onClick={alternarGravacaoAudioMsg} style={{ background: 'transparent', border: 'none', color: gravandoAudioMsg ? '#f43f5e' : 'var(--icon-color)', fontSize: '18px', cursor: 'pointer', padding: 0 }}>
-                {gravandoAudioMsg ? "🛑" : "🎙️"}
-              </button>
-              <input type="text" placeholder={gravandoAudioMsg ? "Gravando áudio..." : "Digite uma mensagem..."} value={texto} onChange={e => setTexto(e.target.value)} disabled={gravandoAudioMsg} />
-              <button type="submit" style={{ background: 'transparent', border: 'none', color: 'var(--icon-color)', fontSize: '20px', cursor: 'pointer', padding: 0, fontWeight: 'bold' }}>➤</button>
+              
+              <input type="text" placeholder={gravandoAudioMsg ? "Gravando áudio..." : ""} value={texto} onChange={e => setTexto(e.target.value)} disabled={gravandoAudioMsg} />
+              
+              {!texto && (
+                <button type="button" onClick={alternarGravacaoAudioMsg} className="icon-btn-input" style={{ color: gravandoAudioMsg ? '#f43f5e' : 'var(--icon-color)' }}>
+                  <svg className="icon-svg" viewBox="0 0 24 24"><path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+                </button>
+              )}
+
+              {!texto && (
+                <button type="button" className="icon-btn-input">
+                   <svg className="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
+                </button>
+              )}
+
+              {texto && (
+                <button type="submit" className="icon-btn-input">
+                   <svg className="icon-svg" viewBox="0 0 24 24" style={{fill: 'currentColor', border: 'none'}}><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+              )}
             </form>
           </div>
         )}

@@ -1,21 +1,21 @@
 :root {
   /* ☀️ TEMA CLARO */
-  --bg-gradient: linear-gradient(180deg, #C7E3FF 0%, #EFEFEF 100%);
-  --bg-card: #EFEFEF;
+  --bg-gradient: linear-gradient(180deg, #E0F2FE 0%, #dce9f5 100%);
+  --bg-card: #ffffff;
   --bg-input: #ffffff;
   
   --btn-blue-grad: linear-gradient(90deg, #0092E7 0%, #0F337B 100%);
   --btn-gold-grad: linear-gradient(90deg, #FECF02 0%, #D68E13 100%);
   
-  --text-main: #0F337B;
+  --text-main: #0B192C;
   --text-muted: #4a5c75;
-  --border-color: #0F337B;
+  --border-color: #0B192C; 
   
   --chat-header-bg: transparent;
   --bubble-me: #ffffff;
-  --bubble-other: #e2e8f0;
-  --chat-glow: none;
-  --icon-color: #0F337B;
+  --bubble-other: #d1d5db; 
+  --chat-glow: 0 4px 10px rgba(0,0,0,0.05); 
+  --icon-color: #0B192C;
   --chat-input-bar-bg: transparent;
 
   /* LAGOA TEMA CLARO */
@@ -28,26 +28,26 @@
 }
 
 [data-theme="dark"] {
-  /* 🌙 TEMA ESCURO */
-  --bg-gradient: linear-gradient(180deg, #0A1D44 0%, #5D0269 100%);
-  --bg-card: #1E1A2F; 
-  --bg-input: #2A243D;
+  /* 🌙 TEMA ESCURO (Exato ao Print) */
+  --bg-gradient: linear-gradient(180deg, #1c153b 0%, #431058 100%);
+  --bg-card: #2a1f4c; 
+  --bg-input: #3d2b63;
   
   --btn-blue-grad: linear-gradient(90deg, #5D0269 0%, #2a0130 100%);
   --btn-gold-grad: linear-gradient(90deg, #FECF02 0%, #D68E13 100%);
   
-  --text-main: #E2E8F0;
-  --text-muted: #94A3B8;
-  --border-color: #4A446A;
+  --text-main: #eaddff; 
+  --text-muted: #a79bc9;
+  --border-color: rgba(234, 221, 255, 0.3); 
   
   --chat-header-bg: transparent;
-  --bubble-me: #3D355C;
-  --bubble-other: #2A243D;
-  --chat-glow: 0px 0px 20px rgba(255, 255, 255, 0.08);
-  --icon-color: #C7E3FF;
+  --bubble-me: #ffffff;
+  --bubble-other: #d1d5db; 
+  --chat-glow: 0px 0px 20px rgba(255, 255, 255, 0.4); 
+  --icon-color: #eaddff;
   --chat-input-bar-bg: transparent;
 
-  /* LAGOA TEMA ESCURO - REFLEXOS E SOMBRAS 3D */
+  /* LAGOA TEMA ESCURO */
   --lagoa-card-bg: #CFAEE3;
   --lagoa-text: #2A1B54;
   --lagoa-border: rgba(42, 27, 84, 0.15);
