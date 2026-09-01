@@ -61,6 +61,9 @@ export default function ChatPage() {
 
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
   const [menuMensagemAberto, setMenuMensagemAberto] = useState<string | null>(null);
+  
+  // NOVO ESTADO: Armazena qual mensagem estamos respondendo
+  const [respondendoA, setRespondendoA] = useState<{ id: string, usuario: string, texto: string } | null>(null);
 
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
   const [ganhoMicrofone, setGanhoMicrofone] = useState<number>(100);
@@ -798,10 +801,20 @@ export default function ChatPage() {
   const enviarMensagem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!texto.trim() && !imagemBase64) return;
+    
+    // Concatena a resposta se houver
+    let msgFinal = texto;
+    if (respondendoA) {
+       msgFinal = `[Respondendo ${respondendoA.usuario}: ${respondendoA.texto.substring(0, 30)}${respondendoA.texto.length > 30 ? '...' : ''}]\n\n${texto}`;
+    }
+
     const isPrivado = abaAtiva !== "lagoa"; const salaAlvo = isPrivado ? abaAtiva : lagoaId;
     if (!salaAlvo) return;
-    socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: isPrivado ? `${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: texto, imagem: isPrivado ? imagemBase64 : null });
-    setTexto(""); setImagemBase64(null);
+    socketRef.current?.emit("enviar_mensagem", { salaId: salaAlvo, remetenteNome: isPrivado ? `${meuNomeReal}#${minhaTag}` : meuNomeAnon, mensagem: msgFinal, imagem: isPrivado ? imagemBase64 : null });
+    
+    setTexto(""); 
+    setImagemBase64(null);
+    setRespondendoA(null);
   };
 
   const apagarMensagem = (msgId: string) => {
@@ -863,15 +876,18 @@ export default function ChatPage() {
         .chat-bubble-wrapper:hover .msg-dots-btn { opacity: 1; }
         .msg-dots-btn:hover { background: rgba(0,0,0,0.1); color: var(--text-main); }
         
-        /* Ajuste crucial: bottom: 0 força o menu a abrir para cima, nunca será cortado */
         .msg-dropdown { position: absolute; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; display: flex; flex-direction: column; min-width: 140px; overflow: hidden; padding: 6px 0; }
         .msg-dropdown-btn { background: transparent; border: none; padding: 10px 16px; text-align: left; color: var(--text-main); font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; gap: 8px; align-items: center; }
         .msg-dropdown-btn:hover { background: var(--bg-input); }
         .msg-dropdown-btn.danger { color: #f43f5e; }
 
-        /* 🦆 CAIXA DE TEXTO (INPUT) CORRIGIDA (Max width centralizado) 🦆 */
+        /* 🦆 CAIXA DE TEXTO (INPUT) E REPLY BOX 🦆 */
         .chat-input-area { padding: 16px 24px; background: transparent; display: flex; flex-direction: column; align-items: center; }
-        .chat-input-bar { width: 100%; max-width: 800px; display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 99px; padding: 12px 20px; background: var(--bg-input); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .reply-box { width: 100%; max-width: 800px; display: flex; align-items: center; justify-content: space-between; background: var(--bg-card); border: 1px solid var(--border-color); border-bottom: none; border-radius: 16px 16px 0 0; padding: 12px 16px; margin-bottom: -16px; z-index: 5; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); }
+        .chat-input-bar { width: 100%; max-width: 800px; display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 99px; padding: 12px 20px; background: var(--bg-input); box-shadow: 0 4px 15px rgba(0,0,0,0.05); z-index: 10; position: relative; }
+        /* Quando está respondendo, removemos o raio superior do input para encaixar na reply box */
+        .chat-input-bar.is-replying { border-radius: 0 0 16px 16px; }
+        
         .chat-input-bar input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-main); margin-left: 12px; font-size: 15px; }
         
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
@@ -894,6 +910,17 @@ export default function ChatPage() {
 
         .hamburger-btn { display: none; background: transparent; border: none; color: var(--icon-color); font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
         
+        /* 🦆 CORREÇÃO DO SPINNER "PROCURANDO PATOS..." 🦆 */
+        .search-spinner { 
+          width: 60px; height: 60px; 
+          border: 4px solid var(--border-color); 
+          border-top-color: transparent; 
+          border-radius: 50%; 
+          animation: spin 1s linear infinite; 
+          margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         @media (max-width: 768px) {
           .chat-sidebar { position: absolute; left: 68px; height: 100%; transform: translateX(-100%); width: calc(100% - 68px); background: var(--bg-gradient); box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
           .chat-sidebar.open { transform: translateX(0); }
@@ -1112,9 +1139,9 @@ export default function ChatPage() {
 
         {isLagoa && procurando && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: '60px', height: '60px', border: '4px solid var(--border-color)', borderTopColor: 'var(--icon-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-            <h3 style={{color: 'var(--text-main)', marginTop: '20px'}}>Procurando patos...</h3>
-            <button onClick={cancelarBusca} style={{ marginTop: '20px', background: 'var(--bg-input)', color: '#f43f5e', border: '1px solid #f43f5e', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer' }}>Cancelar</button>
+            <div className="search-spinner"></div>
+            <h3 style={{color: 'var(--text-main)', margin: '0 0 20px 0'}}>Procurando patos...</h3>
+            <button onClick={cancelarBusca} style={{ background: 'var(--bg-input)', color: '#f43f5e', border: '1px solid #f43f5e', padding: '10px 30px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
           </div>
         )}
 
@@ -1172,6 +1199,18 @@ export default function ChatPage() {
               else avatarMsg = chatAtivoData?.amigoRef?.avatar || chatAtivoData?.icone || "🦆";
             }
 
+            // Checa se a mensagem é uma resposta
+            const isReply = msg.mensagem.startsWith("[Respondendo");
+            let replyInfo = null;
+            let msgContent = msg.mensagem;
+            if (isReply) {
+              const match = msg.mensagem.match(/\[Respondendo (.*?): (.*?)\]\n\n(.*)/s);
+              if (match) {
+                replyInfo = { user: match[1], text: match[2] };
+                msgContent = match[3];
+              }
+            }
+
             return (
               <div key={msg.id} className="chat-bubble-wrapper" style={{ 
                 flexDirection: eMinha && !eSistema ? 'row-reverse' : 'row',
@@ -1202,11 +1241,28 @@ export default function ChatPage() {
                     
                     <div className={`chat-bubble ${eMinha ? 'me' : 'other'}`} style={{ 
                       background: eSistema ? 'var(--bg-input)' : (eMinha ? 'var(--bubble-me)' : 'var(--bubble-other)'), 
-                      color: eSistema ? 'var(--text-main)' : (eMinha ? (isDark ? '#000' : 'var(--text-main)') : 'var(--text-main)'), 
+                      color: eSistema ? 'var(--text-main)' : (eMinha ? (isDark ? '#fff' : 'var(--text-main)') : 'var(--text-main)'), 
                       borderRadius: eMinha ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
                       border: eSistema ? '1px solid var(--border-color)' : '' 
                     }}>
-                      {msg.mensagem}
+                      
+                      {/* CAIXA DE MENSAGEM RESPONDIDA */}
+                      {replyInfo && (
+                        <div style={{ 
+                          background: 'rgba(0,0,0,0.1)', 
+                          borderLeft: '4px solid var(--icon-color)', 
+                          padding: '6px 10px', 
+                          borderRadius: '4px', 
+                          marginBottom: '8px',
+                          fontSize: '12px'
+                        }}>
+                          <span style={{ fontWeight: 'bold', display: 'block', color: eMinha && isDark ? '#fff' : 'var(--icon-color)' }}>{replyInfo.user}</span>
+                          <span style={{ opacity: 0.8 }}>{replyInfo.text}</span>
+                        </div>
+                      )}
+
+                      {msgContent}
+                      
                       {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{maxWidth: '100%', borderRadius: '8px', marginTop: '8px'}}/>}
                       {msg.audio && <audio src={msg.audio} controls style={{marginTop: '8px', width: '100%'}}/>}
                       <div style={{fontSize: '10px', textAlign: 'right', marginTop: '4px', opacity: 0.5}}>{msg.hora}</div>
@@ -1221,7 +1277,7 @@ export default function ChatPage() {
                         <div className="msg-dropdown" style={eMinha ? { right: '100%', marginRight: '8px', bottom: '0' } : { left: '100%', marginLeft: '8px', bottom: '0' }}>
                           
                           <button className="msg-dropdown-btn" onClick={() => { 
-                            setTexto(`Respondendo ${nomeLimpo}: `); 
+                            setRespondendoA({ id: msg.id, usuario: nomeLimpo, texto: msgContent });
                             setMenuMensagemAberto(null); 
                           }}>
                             ↩ Responder
@@ -1229,7 +1285,7 @@ export default function ChatPage() {
                           
                           {eMinha && (
                             <button className="msg-dropdown-btn" onClick={() => { 
-                              setTexto(msg.mensagem); 
+                              setTexto(msgContent); 
                               apagarMensagem(msg.id); 
                               setMenuMensagemAberto(null); 
                             }}>
@@ -1261,12 +1317,24 @@ export default function ChatPage() {
         {((isLagoa && lagoaAtiva) || !isLagoa) && (
           <div className="chat-input-area">
             {imagemBase64 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px 16px', borderRadius: '16px', marginBottom: '12px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '800px' }}>
-                <img src={imagemBase64} style={{ height: '40px', borderRadius: '4px' }} />
-                <span onClick={() => setImagemBase64(null)} style={{ cursor: 'pointer', color: '#f43f5e', fontWeight: 'bold', marginLeft: 'auto' }}>✕ Remover Foto</span>
+              <div style={{display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--bg-input)', padding: '8px', borderRadius: '12px', marginBottom: '8px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '800px'}}>
+                <img src={imagemBase64} style={{height: '40px', borderRadius: '4px'}} />
+                <span onClick={() => setImagemBase64(null)} style={{cursor: 'pointer', color: '#f43f5e', fontWeight: 'bold', marginLeft: 'auto'}}>✕ Remover</span>
               </div>
             )}
-            <form onSubmit={enviarMensagem} className="chat-input-bar">
+            
+            {/* ✅ CAIXA DE "RESPONDENDO A..." */}
+            {respondendoA && (
+              <div className="reply-box">
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--icon-color)' }}>Respondendo {respondendoA.usuario}:</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{respondendoA.texto.substring(0, 50)}{respondendoA.texto.length > 50 ? '...' : ''}</span>
+                </div>
+                <button onClick={() => setRespondendoA(null)} style={{ background: 'transparent', border: 'none', color: '#f43f5e', fontSize: '16px', cursor: 'pointer', fontWeight: 'bold' }}>✕</button>
+              </div>
+            )}
+
+            <form onSubmit={enviarMensagem} className={`chat-input-bar ${respondendoA ? 'is-replying' : ''}`}>
               <label style={{ cursor: 'pointer', color: 'var(--icon-color)', marginRight: '10px', display: 'flex', alignItems: 'center' }}>
                 📎 <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
               </label>
