@@ -17,10 +17,17 @@
   --chat-glow: none;
   --icon-color: #0F337B;
   --chat-input-bar-bg: transparent;
+
+  /* LAGOA TEMA CLARO */
+  --lagoa-card-bg: #EAEAEA;
+  --lagoa-text: #0F337B;
+  --lagoa-border: #0F337B;
+  --lagoa-btn-shadow: 4px 4px 10px rgba(0,0,0,0.1), -4px -4px 10px rgba(255,255,255,0.8);
+  --lagoa-btn-shadow-active: inset 4px 4px 10px rgba(0,0,0,0.1), inset -4px -4px 10px rgba(255,255,255,0.8);
 }
 
 [data-theme="dark"] {
-  /* 🌙 TEMA ESCURO (CORRIGIDO: Suave e elegante) */
+  /* 🌙 TEMA ESCURO (CORRIGIDO: Suave e noturno) */
   --bg-gradient: linear-gradient(180deg, #0A1D44 0%, #5D0269 100%);
   --bg-card: #1E1A2F; 
   --bg-input: #2A243D;
@@ -38,6 +45,13 @@
   --chat-glow: 0px 0px 20px rgba(255, 255, 255, 0.08);
   --icon-color: #C7E3FF;
   --chat-input-bar-bg: transparent;
+
+  /* LAGOA TEMA ESCURO (Exato do seu Print 2) */
+  --lagoa-card-bg: #CFAEE3;
+  --lagoa-text: #2A1B54;
+  --lagoa-border: #2A1B54;
+  --lagoa-btn-shadow: 4px 4px 10px rgba(0,0,0,0.15), -4px -4px 10px rgba(255,255,255,0.3);
+  --lagoa-btn-shadow-active: inset 4px 4px 10px rgba(0,0,0,0.15), inset -4px -4px 10px rgba(255,255,255,0.3);
 }
 
 html, body {

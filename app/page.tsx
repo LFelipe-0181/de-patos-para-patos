@@ -5,7 +5,7 @@ import { useState } from "react";
 import "./theme.css";
 
 export default function Home() {
-  // FORÇANDO TEMA CLARO NO INÍCIO
+  // AQUI FORÇA A TELA COMEÇAR NO TEMA CLARO ☀️
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [telaAtiva, setTelaAtiva] = useState<"intro" | "auth">("intro");
   const [isLogin, setIsLogin] = useState(true);
@@ -43,7 +43,9 @@ export default function Home() {
           box-sizing: border-box;
           overflow-x: hidden;
         }
+        /* FUNDO DA INTRO AZUL CONFORME PEDIDO */
         .app-wrapper.intro-bg { background: var(--btn-blue-grad) !important; }
+        
         .auth-container { width: 100%; max-width: 440px; padding: 24px; box-sizing: border-box; position: relative; }
         .main-card {
           position: relative; width: 100%; background-color: var(--bg-card);

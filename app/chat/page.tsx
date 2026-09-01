@@ -130,7 +130,7 @@ export default function ChatPage() {
     }
   };
 
-  // CORREÇÃO: Fallback Inteligente se o Banco de Dados falhar
+  // ✅ CORREÇÃO: Sistema Reserva se o Banco (Prisma) falhar e não mandar o Nome
   useEffect(() => {
     if (session?.user) {
       const email = session.user.email || `${session.user.name?.toLowerCase().replace(/\s+/g, '')}@duckzone.local`;
@@ -150,6 +150,7 @@ export default function ChatPage() {
             if (data.bio) setMeuStatusBio(data.bio);
             if (data.gender) setMeuGenero(data.gender);
           } else {
+            // SE O BANCO DEU ERRO, PUXA DO GOOGLE PRA NÃO FICAR O #0000
             setMeuNomeReal(session?.user?.name || "Pato Logado");
             setMinhaTag(session?.user?.email?.length.toString().padStart(4, '0') || "2629");
           }
@@ -679,7 +680,7 @@ export default function ChatPage() {
     setLagoaAtiva(false); setLagoaId(null); setConfirmados(0); setTempoRestante(null); setLagoaNaoLida(false);
   };
 
-  // CORREÇÃO: Função de solicitar chamada segura
+  // ✅ CORREÇÃO DO BOTÃO LIGAR: Agora com proteção anti-crash e garantindo que o status mostre!
   const solicitarChamadaVoz = () => {
     const salaAlvo = abaAtivaRef.current !== "lagoa" ? abaAtivaRef.current : lagoaIdRef.current;
     if (!salaAlvo || abaAtivaRef.current === "lagoa") return;
@@ -869,17 +870,18 @@ export default function ChatPage() {
         .d-action-btn { width: 40px; height: 40px; border-radius: 50%; border: none; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .pro-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); outline: none; }
         
-        /* 🦆 NOVO VISUAL DA LAGOA PÚBLICA 🦆 */
+        /* 🦆 NOVO VISUAL DA LAGOA PÚBLICA (IDÊNTICO AO PRINT) 🦆 */
         .lagoa-card-container {
           position: relative;
-          background-color: var(--bg-card);
-          border: 1px solid var(--border-color);
+          background-color: var(--lagoa-card-bg);
+          border: 1px solid var(--lagoa-border);
           border-radius: 16px;
           padding: 40px 24px 24px;
           max-width: 420px;
           width: 100%;
           text-align: center;
           margin-top: 50px;
+          box-shadow: 0px 15px 40px rgba(0,0,0,0.3);
         }
         .lagoa-top-img {
           position: absolute;
@@ -892,36 +894,37 @@ export default function ChatPage() {
         .lagoa-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 12px;
+          gap: 16px;
           margin-bottom: 24px;
         }
         .lagoa-btn {
-          background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.05) 100%);
-          border: 1px solid var(--border-color);
+          background: transparent;
+          border: 1px solid rgba(0,0,0,0.1);
           border-radius: 99px;
           padding: 12px 4px;
-          color: var(--text-main);
+          color: var(--lagoa-text);
           font-size: 13px;
           cursor: pointer;
-          box-shadow: 0px 4px 10px rgba(0,0,0,0.15), inset 0px 2px 4px rgba(255,255,255,0.3);
-          transition: all 0.2s;
+          box-shadow: var(--lagoa-btn-shadow);
+          transition: all 0.2s ease;
         }
         .lagoa-btn:hover {
           transform: translateY(-2px);
-          box-shadow: 0px 6px 14px rgba(0,0,0,0.2), inset 0px 2px 4px rgba(255,255,255,0.4);
         }
         .lagoa-btn.active {
-          background: rgba(0,0,0,0.05);
-          border-width: 2px;
-          font-weight: bold;
-          box-shadow: inset 0px 2px 5px rgba(0,0,0,0.2);
+          box-shadow: var(--lagoa-btn-shadow-active);
+          border-color: var(--lagoa-border);
+          font-weight: 800;
         }
         .lagoa-footer-text {
           font-size: 11px;
-          color: var(--text-main);
+          color: var(--lagoa-text);
           line-height: 1.4;
           opacity: 0.8;
           margin: 0;
+        }
+        .lagoa-card-container p, .lagoa-card-container h2 {
+          color: var(--lagoa-text) !important;
         }
 
         .hamburger-btn { display: none; background: transparent; border: none; color: var(--icon-color); font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
@@ -1089,17 +1092,18 @@ export default function ChatPage() {
           </div>
         </header>
 
-        {/* CORREÇÃO: Status de Ligar/Chamada e Convites fora do container de rolagem pra nunca sumir */}
+        {/* ✅ AVISO DE CHAMADA FLUTUANTE (NUNCA SUMIRÁ) */}
         {((isLagoa && lagoaAtiva) || !isLagoa) && statusConvite && (
           <div style={{ 
-            background: "var(--bg-input)", border: "1px solid var(--border-color)", color: "var(--text-main)", 
-            padding: "12px 20px", textAlign: "center", borderRadius: "10px", margin: "16px 24px 0",
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
+            position: 'absolute', top: '80px', left: '50%', transform: 'translateX(-50%)',
+            background: "var(--btn-blue-grad)", border: "1px solid var(--border-color)", color: "#fff", 
+            padding: "12px 24px", textAlign: "center", borderRadius: "99px", zIndex: 999,
+            display: "flex", justifyContent: "space-between", alignItems: "center", gap: '16px',
+            boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
           }}>
-            <span style={{ fontWeight: 'bold' }}>{statusConvite}</span>
+            <span style={{ fontWeight: 'bold', fontSize: '15px' }}>{statusConvite}</span>
             {!isLagoa && statusConvite.includes("Chamando") && (
-               <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}>Cancelar ✖</button>
+               <button onClick={desligarChamada} style={{ background: "#f43f5e", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "99px", fontWeight: 'bold', cursor: "pointer" }}>Desligar ✖</button>
             )}
           </div>
         )}
@@ -1110,7 +1114,7 @@ export default function ChatPage() {
             <div className="lagoa-card-container">
               <img src={lagoImgSrc} alt="Lagoa" className="lagoa-top-img" />
               
-              <p style={{ color: 'var(--text-main)', fontSize: '14px', marginBottom: '24px', fontWeight: '500' }}>
+              <p style={{ fontSize: '15px', marginBottom: '32px', fontWeight: '500' }}>
                 Selecione que tipo de pessoa deseja encontrar na lagoa.
               </p>
               
@@ -1138,7 +1142,7 @@ export default function ChatPage() {
               </p>
             </div>
 
-            <button onClick={procurarPato} style={{ marginTop: '24px', padding: '16px 32px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '99px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
+            <button onClick={procurarPato} style={{ marginTop: '24px', padding: '16px 40px', background: 'var(--btn-blue-grad)', color: '#fff', border: 'none', borderRadius: '99px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,0,0,0.2)' }}>
               MERGULHAR 🚀
             </button>
           </div>
