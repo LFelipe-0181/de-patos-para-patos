@@ -61,6 +61,9 @@ export default function ChatPage() {
 
   const [menuAberto, setMenuAberto] = useState<boolean>(false);
 
+  // NOVO: Controle do menu de 3 pontinhos das mensagens
+  const [menuMensagemAberto, setMenuMensagemAberto] = useState<string | null>(null);
+
   const [volumeSaida, setVolumeSaida] = useState<number>(100);
   const [ganhoMicrofone, setGanhoMicrofone] = useState<number>(100);
   const ganhoMicrofoneRef = useRef<number>(100);
@@ -130,7 +133,16 @@ export default function ChatPage() {
     }
   };
 
-  // Garante a Tag caso banco falhe
+  useEffect(() => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.muted = audioMutado;
+      remoteAudioRef.current.volume = volumeSaida / 100;
+    }
+    if (testAudioRef.current) {
+      testAudioRef.current.volume = volumeSaida / 100;
+    }
+  }, [audioMutado, volumeSaida]);
+
   useEffect(() => {
     if (session?.user) {
       const email = session.user.email || `${session.user.name?.toLowerCase().replace(/\s+/g, '')}@duckzone.local`;
@@ -805,14 +817,13 @@ export default function ChatPage() {
   const ehChatDeAmigo = Boolean(chatAtivoData?.amigoRef);
 
   return (
-    <div data-theme={theme} className="app-layout">
+    <div data-theme={theme} className="app-layout" onClick={() => setMenuMensagemAberto(null)}>
       {menuAberto && <div className="menu-overlay open" onClick={() => setMenuAberto(false)}></div>}
 
       <audio ref={remoteAudioRef} autoPlay playsInline controls={false} style={{ display: 'none' }} />
       <audio ref={testAudioRef} autoPlay playsInline muted={false} style={{ display: 'none' }} />
 
       <style dangerouslySetInnerHTML={{__html: `
-        /* 🦆 FIX DE SCROLLBARS MODERNO E LIMPO */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 10px; }
@@ -821,13 +832,11 @@ export default function ChatPage() {
 
         .app-layout { display: flex; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-gradient); color: var(--text-main); font-family: -apple-system, sans-serif; }
         
-        /* 1. BARRA DE ICONES LATERAL */
         .chat-icon-rail { width: 68px; background-color: rgba(0, 0, 0, 0.08); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding: 20px 0; gap: 16px; z-index: 20; flex-shrink: 0; }
         .rail-btn { width: 46px; height: 46px; border-radius: 14px; border: 1px solid var(--border-color); background-color: var(--bg-input); color: var(--text-main); display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; transition: all 0.2s; }
         .rail-btn.active { background: var(--btn-blue-grad); color: #fff; border-color: transparent; }
         .rail-btn-duck { width: 28px; height: 28px; object-fit: contain; }
         
-        /* 2. MENU LATERAL (AGORA MAIS LARGO: 340px) */
         .chat-sidebar { width: 340px; background-color: rgba(255, 255, 255, 0.2); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-sizing: border-box; transition: transform 0.3s; z-index: 15; backdrop-filter: blur(5px); }
         .sidebar-header-area { padding: 20px 16px 10px; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-title { font-size: 18px; font-weight: 800; color: var(--text-main); margin: 0; }
@@ -839,7 +848,6 @@ export default function ChatPage() {
         .status-dot { width: 10px; height: 10px; border-radius: 50%; }
         .status-dot.online { background-color: #10b981; } .status-dot.offline { background-color: #9ca3af; }
         
-        /* 3. ÁREA PRINCIPAL DO CHAT */
         .chat-main-area { flex: 1; display: flex; flex-direction: column; justify-content: space-between; position: relative; min-width: 0; background: transparent; }
         .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: var(--chat-header-bg); border-bottom: 1px solid var(--border-color); }
         .chat-header-user { display: flex; align-items: center; gap: 12px; }
@@ -847,88 +855,43 @@ export default function ChatPage() {
         .chat-header-name { font-size: 18px; font-weight: 700; color: var(--text-main); }
         .chat-icons { display: flex; gap: 18px; font-size: 20px; color: var(--icon-color); cursor: pointer; }
         
-        .chat-messages { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
-        .chat-bubble { max-width: 60%; padding: 14px 20px; border-radius: 24px; font-size: 15px; color: #000; box-shadow: var(--chat-glow); line-height: 1.45; word-break: break-word; }
-        .chat-bubble.me { align-self: flex-end; background-color: var(--bubble-me); border-bottom-right-radius: 4px; color: var(--text-main); }
-        .chat-bubble.other { align-self: flex-start; background-color: var(--bubble-other); border-bottom-left-radius: 4px; color: var(--text-main); }
+        .chat-messages { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+        .chat-bubble { padding: 10px 14px; font-size: 14px; box-shadow: var(--chat-glow); line-height: 1.45; word-break: break-word; }
         
+        /* 🦆 NOVO: ESTILOS DO MENU DE 3 PONTINHOS DAS MENSAGENS 🦆 */
+        .chat-bubble-wrapper { display: flex; gap: 12px; align-items: flex-end; width: 100%; position: relative; }
+        .msg-options-container { position: relative; display: flex; align-items: center; justify-content: center; }
+        .msg-dots-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 4px; opacity: 0; transition: opacity 0.2s ease; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
+        .chat-bubble-wrapper:hover .msg-dots-btn { opacity: 1; }
+        .msg-dots-btn:hover { background: rgba(0,0,0,0.1); color: var(--text-main); }
+        .msg-dropdown { position: absolute; top: 100%; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 50; display: flex; flex-direction: column; min-width: 140px; overflow: hidden; padding: 4px 0; }
+        .msg-dropdown-btn { background: transparent; border: none; padding: 10px 16px; text-align: left; color: var(--text-main); font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; gap: 8px; align-items: center; }
+        .msg-dropdown-btn:hover { background: var(--bg-input); }
+        .msg-dropdown-btn.danger { color: #f43f5e; }
+
         .chat-input-area { padding: 20px 24px; background: transparent; }
         .chat-input-bar { display: flex; align-items: center; border: 1.5px solid var(--border-color); border-radius: 99px; padding: 10px 18px; background: var(--chat-input-bar-bg); }
         .chat-input-bar input { flex: 1; background: transparent; border: none; outline: none; color: var(--text-main); margin-left: 12px; font-size: 15px; }
         
-        /* 4. MODAIS E CONFIGURAÇÕES */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
         .modal-card { background: var(--bg-card); width: 100%; max-width: 400px; border-radius: 20px; border: 1px solid var(--border-color); overflow: hidden; display: flex; flex-direction: column; max-height: 85vh; }
         .modal-header { padding: 16px 20px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-weight: bold; }
         .modal-body { padding: 20px; overflow-y: auto; color: var(--text-main); display: flex; flex-direction: column; gap: 16px;}
         
-        /* 5. OUTROS ELEMENTOS (Botões, Cards da Lagoa) */
-        .btn-call { padding: 8px 16px; border-radius: 12px; border: 1px solid #10b981; color: #10b981; background: rgba(16,185,129,0.1); cursor: pointer; font-weight: bold; }
         .d-call-panel { background: var(--bg-input); border: 1px solid var(--border-color); margin: 12px 24px; padding: 12px 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
         .d-action-btn { width: 40px; height: 40px; border-radius: 50%; border: none; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .pro-input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-main); outline: none; }
         
-        /* 🦆 NOVO VISUAL DA LAGOA PÚBLICA (COM O REFLEXO 3D EXATO) 🦆 */
-        .lagoa-card-container {
-          position: relative;
-          background-color: var(--lagoa-card-bg);
-          border: 1px solid var(--lagoa-border);
-          border-radius: 16px;
-          padding: 40px 24px 24px;
-          max-width: 420px;
-          width: 100%;
-          text-align: center;
-          margin-top: 50px;
-          box-shadow: 0px 15px 40px rgba(0,0,0,0.3);
-        }
-        .lagoa-top-img {
-          position: absolute;
-          top: -45px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 110px;
-          z-index: 10;
-        }
-        .lagoa-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-          margin-bottom: 24px;
-        }
-        .lagoa-btn {
-          background: var(--lagoa-btn-bg);
-          border: 1px solid rgba(255,255,255,0.2);
-          border-radius: 99px;
-          padding: 12px 4px;
-          color: var(--lagoa-text);
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          box-shadow: var(--lagoa-btn-shadow);
-          transition: all 0.2s ease;
-        }
-        .lagoa-btn:hover {
-          transform: translateY(-2px);
-        }
-        .lagoa-btn.active {
-          box-shadow: var(--lagoa-btn-shadow-active);
-          border-color: rgba(0,0,0,0.05);
-          background: rgba(0,0,0,0.02);
-          font-weight: 800;
-        }
-        .lagoa-footer-text {
-          font-size: 11px;
-          color: var(--lagoa-text);
-          line-height: 1.4;
-          opacity: 0.8;
-          margin: 0;
-        }
-        .lagoa-card-container p, .lagoa-card-container h2 {
-          color: var(--lagoa-text) !important;
-        }
+        .lagoa-card-container { position: relative; background-color: var(--lagoa-card-bg); border: 1px solid var(--lagoa-border); border-radius: 16px; padding: 40px 24px 24px; max-width: 420px; width: 100%; text-align: center; margin-top: 50px; box-shadow: 0px 15px 40px rgba(0,0,0,0.3); }
+        .lagoa-top-img { position: absolute; top: -45px; left: 50%; transform: translateX(-50%); width: 110px; z-index: 10; }
+        .lagoa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .lagoa-btn { background: var(--lagoa-btn-bg); border: 1px solid rgba(255,255,255,0.2); border-radius: 99px; padding: 12px 4px; color: var(--lagoa-text); font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: var(--lagoa-btn-shadow); transition: all 0.2s ease; }
+        .lagoa-btn:hover { transform: translateY(-2px); }
+        .lagoa-btn.active { box-shadow: var(--lagoa-btn-shadow-active); border-color: rgba(0,0,0,0.05); background: rgba(0,0,0,0.02); font-weight: 800; }
+        .lagoa-footer-text { font-size: 11px; color: var(--lagoa-text); line-height: 1.4; opacity: 0.8; margin: 0; }
+        .lagoa-card-container p, .lagoa-card-container h2 { color: var(--lagoa-text) !important; }
 
         .hamburger-btn { display: none; background: transparent; border: none; color: var(--icon-color); font-size: 26px; cursor: pointer; padding: 0; margin-right: 16px; transition: transform 0.2s; }
-        .hamburger-btn:active { transform: scale(0.9); }
         
         @media (max-width: 768px) {
           .chat-sidebar { position: absolute; left: 68px; height: 100%; transform: translateX(-100%); width: calc(100% - 68px); background: var(--bg-gradient); box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
@@ -936,7 +899,6 @@ export default function ChatPage() {
           .hamburger-btn { display: block; }
           .menu-overlay.open { display: block; }
           .main-chat-area { width: 100%; }
-          .chat-bubble { max-width: 85%; }
         }
       `}} />
 
@@ -1192,13 +1154,108 @@ export default function ChatPage() {
           {((isLagoa && lagoaAtiva) || !isLagoa) && msgsAtuais.map(msg => {
             const eMinha = msg.usuario === (isLagoa ? meuNomeAnon : `${meuNomeReal}#${minhaTag}`);
             const eSistema = msg.usuario.includes("SISTEMA");
+
+            let nomeLimpo = msg.usuario;
+            if (nomeLimpo.includes("data:image")) {
+              const match = nomeLimpo.match(/([a-zA-Z0-9_ -]+#\d{4})/);
+              if (match) nomeLimpo = match[1];
+              else nomeLimpo = nomeLimpo.split(" ").pop() || "Pato";
+            }
+            nomeLimpo = nomeLimpo.replace(/^[^\w\s]+/, '').trim();
+
+            let avatarMsg = "🦆";
+            if (isLagoa) {
+              avatarMsg = eSistema ? "🤖" : "🎭";
+            } else {
+              if (eSistema) avatarMsg = "🤖";
+              else if (eMinha) avatarMsg = meuAvatar;
+              else avatarMsg = chatAtivoData?.amigoRef?.avatar || chatAtivoData?.icone || "🦆";
+            }
+
             return (
-              <div key={msg.id} className={`chat-bubble ${eMinha ? 'me' : 'other'}`} style={{ alignSelf: eSistema ? 'center' : (eMinha ? 'flex-end' : 'flex-start'), background: eSistema ? 'var(--bg-input)' : '', color: eSistema ? 'var(--text-main)' : '', border: eSistema ? '1px solid var(--border-color)' : '' }}>
-                {!eMinha && !eSistema && <div style={{fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', opacity: 0.7}}>{msg.usuario}</div>}
-                {msg.mensagem}
-                {msg.imagem && <img src={msg.imagem} style={{maxWidth: '100%', borderRadius: '8px', marginTop: '8px'}}/>}
-                {msg.audio && <audio src={msg.audio} controls style={{marginTop: '8px', width: '100%'}}/>}
-                <div style={{fontSize: '10px', textAlign: 'right', marginTop: '4px', opacity: 0.5}}>{msg.hora}</div>
+              <div key={msg.id} className="chat-bubble-wrapper" style={{ 
+                flexDirection: eMinha && !eSistema ? 'row-reverse' : 'row',
+                justifyContent: eSistema ? 'center' : 'flex-start' 
+              }}>
+                
+                {/* ✅ O SEU AVATAR AGORA APARECE AQUI */}
+                {!eSistema && (
+                  <div 
+                    onClick={() => { if(!eMinha && chatAtivoData?.amigoRef) setPerfilAmigoSelecionado(chatAtivoData.amigoRef); }}
+                    style={{ 
+                      width: '36px', height: '36px', borderRadius: '50%', background: 'transparent', border: '1px solid var(--border-color)', 
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0, overflow: 'hidden', 
+                      cursor: !eMinha && chatAtivoData?.amigoRef ? 'pointer' : 'default' 
+                    }}
+                  >
+                    {avatarMsg.startsWith("data:image/") ? (
+                      <img src={avatarMsg} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      avatarMsg
+                    )}
+                  </div>
+                )}
+
+                {/* CORPO DA MENSAGEM E MENU DE OPÇÕES */}
+                <div style={{ display: 'flex', flexDirection: eMinha ? 'row-reverse' : 'row', alignItems: 'center', gap: '8px', maxWidth: '75%' }}>
+                  
+                  {/* BALÃO */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: eMinha && !eSistema ? 'flex-end' : 'flex-start' }}>
+                    {!eMinha && !eSistema && <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px', opacity: 0.7 }}>{nomeLimpo}</div>}
+                    
+                    <div className={`chat-bubble ${eMinha ? 'me' : 'other'}`} style={{ 
+                      background: eSistema ? 'var(--bg-input)' : (eMinha ? 'var(--bubble-me)' : 'var(--bubble-other)'), 
+                      color: eSistema ? 'var(--text-main)' : (eMinha ? (isDark ? '#fff' : 'var(--text-main)') : 'var(--text-main)'), 
+                      borderRadius: eMinha ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                      border: eSistema ? '1px solid var(--border-color)' : '' 
+                    }}>
+                      {msg.mensagem}
+                      {msg.imagem && <img src={msg.imagem} alt="Mídia" style={{maxWidth: '100%', borderRadius: '8px', marginTop: '8px'}}/>}
+                      {msg.audio && <audio src={msg.audio} controls style={{marginTop: '8px', width: '100%'}}/>}
+                      <div style={{fontSize: '10px', textAlign: 'right', marginTop: '4px', opacity: 0.5}}>{msg.hora}</div>
+                    </div>
+                  </div>
+
+                  {/* ✅ OS 3 PONTINHOS E O DROPDOWN AQUI */}
+                  {!eSistema && (
+                    <div className="msg-options-container" onClick={(e) => e.stopPropagation()}>
+                      <button className="msg-dots-btn" onClick={() => setMenuMensagemAberto(menuMensagemAberto === msg.id ? null : msg.id)}>⋮</button>
+                      
+                      {menuMensagemAberto === msg.id && (
+                        <div className="msg-dropdown" style={eMinha ? { right: '100%', marginRight: '8px' } : { left: '100%', marginLeft: '8px' }}>
+                          
+                          <button className="msg-dropdown-btn" onClick={() => { 
+                            setTexto(`Respondendo ${nomeLimpo}: `); 
+                            setMenuMensagemAberto(null); 
+                          }}>
+                            ↩ Responder
+                          </button>
+                          
+                          {eMinha && (
+                            <button className="msg-dropdown-btn" onClick={() => { 
+                              setTexto(msg.mensagem); 
+                              apagarMensagem(msg.id); 
+                              setMenuMensagemAberto(null); 
+                            }}>
+                              ✏️ Editar
+                            </button>
+                          )}
+                          
+                          {eMinha && (
+                            <button className="msg-dropdown-btn danger" onClick={() => { 
+                              apagarMensagem(msg.id); 
+                              setMenuMensagemAberto(null); 
+                            }}>
+                              🗑️ Apagar
+                            </button>
+                          )}
+                          
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
               </div>
             );
           })}
